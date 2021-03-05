@@ -5,12 +5,13 @@ use linkerd_stack::{layer, NewService};
 use parking_lot::RwLock;
 use std::{
     collections::{hash_map::Entry, HashMap},
+    fmt,
     hash::Hash,
     sync::{Arc, Weak},
     task::{Context, Poll},
 };
 use tokio::{sync::Notify, time};
-use tracing::{debug, instrument, trace};
+use tracing::{debug, debug_span, instrument::Instrument, trace};
 
 #[derive(Clone)]
 pub struct Cache<T, N>
@@ -66,16 +67,17 @@ where
         // expires, the handle is checked and the service is dropped if there
         // are no active handles.
         let handle = Arc::new(Notify::new());
-        tokio::spawn(Self::evict(
-            target,
-            idle,
-            handle.clone(),
-            Arc::downgrade(&cache),
-        ));
+        let span = debug_span!(
+            "evict",
+            ?target,
+            handle = ?Ptr(&handle)
+        );
+        tokio::spawn(
+            Self::evict(target, idle, handle.clone(), Arc::downgrade(&cache)).instrument(span),
+        );
         handle
     }
 
-    #[instrument(level = "debug", skip(idle, reset, cache))]
     async fn evict(
         target: T,
         idle: time::Duration,
@@ -107,7 +109,7 @@ where
                         // Otherwise, another handle has been acquired, so
                         // restore our reset reference for the next iteration.
                         Err(r) => {
-                            trace!("The handle is still active");
+                            trace!(refs = Arc::strong_count(&r), "The handle is still active");
                             reset = r;
                         }
                     },
@@ -134,7 +136,12 @@ where
         // only a read lock.
         if let Some((svc, weak)) = self.services.read().get(&target) {
             if let Some(handle) = weak.upgrade() {
-                trace!("Using cached service");
+                trace!(
+                    ?target,
+                    handle = ?Ptr(&handle),
+                    refs = Arc::strong_count(&handle),
+                    "Using cached service"
+                );
                 return Cached {
                     inner: svc.clone(),
                     handle,
@@ -150,15 +157,26 @@ where
                 let (svc, weak) = entry.get();
                 match weak.upgrade() {
                     Some(handle) => {
-                        trace!(?target, "Using cached service");
+                        trace!(
+                            ?target,
+                            handle = ?Ptr(&handle),
+                            refs = Arc::strong_count(&handle),
+                            raced = true,
+                            "Using cached service"
+                        );
                         Cached {
                             inner: svc.clone(),
                             handle,
                         }
                     }
                     None => {
-                        debug!(?target, "Replacing defunct service");
                         let handle = Self::spawn_idle(target.clone(), self.idle, &self.services);
+                        debug!(
+                            ?target,
+                            handle.old = ?Ptr(&weak),
+                            handle.new = ?Ptr(&handle),
+                            "Replacing defunct service"
+                        );
                         let inner = self.inner.new_service(target);
                         entry.insert((inner.clone(), Arc::downgrade(&handle)));
                         Cached { inner, handle }
@@ -166,8 +184,8 @@ where
                 }
             }
             Entry::Vacant(entry) => {
-                debug!(?target, "Caching new service");
                 let handle = Self::spawn_idle(target.clone(), self.idle, &self.services);
+                debug!(?target, handle = ?Ptr(&handle), "Caching new service");
                 let inner = self.inner.new_service(target);
                 entry.insert((inner.clone(), Arc::downgrade(&handle)));
                 Cached { inner, handle }
@@ -202,14 +220,32 @@ where
     S: Send + Sync + 'static,
 {
     fn drop(&mut self) {
+        trace!(
+            handle = ?Ptr(&self.handle),
+            refs = Arc::strong_count(&self.handle),
+            "Dropping cached service",
+        );
         self.handle.notify_one();
+    }
+}
+
+struct Ptr<'a, T>(&'a T);
+
+impl<'a, T> fmt::Debug for Ptr<'a, T>
+where
+    T: fmt::Pointer,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Pointer::fmt(self.0, f)
     }
 }
 
 #[cfg(test)]
 #[tokio::test]
 async fn test_idle_retain() {
-    let _ = tracing_subscriber::fmt::try_init();
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::TRACE)
+        .try_init();
     time::pause();
 
     let idle = time::Duration::from_secs(10);
