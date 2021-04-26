@@ -270,7 +270,7 @@ impl From<(tls::NoClientTls, Target)> for http::Endpoint {
             addr,
             metadata: Metadata::default(),
             tls: Conditional::None(reason),
-            logical_addr: dst,
+            logical_addr,
             protocol: version,
         }
     }
