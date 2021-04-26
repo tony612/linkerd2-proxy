@@ -3,28 +3,37 @@ use linkerd_app_core::{
     config::{ProxyConfig, ServerConfig},
     detect, discovery_rejected, drain, errors, http_request_l5d_override_dst_addr, http_tracing,
     io, profiles,
-    proxy::api_resolve::Metadata,
+    proxy::{
+        api_resolve::{ConcreteAddr, Metadata},
+        core::Resolve,
+    },
     svc::{self, stack::Param},
     tls,
-    transport::{self, ClientAddr, OrigDstAddr, Remote, ServerAddr},
+    transport::{ClientAddr, OrigDstAddr, Remote, ServerAddr},
     Addr, AddrMatch, Conditional, Error,
 };
 use std::convert::TryFrom;
 use thiserror::Error;
 use tracing::{debug_span, info_span};
 
-impl Outbound<()> {
+impl<C> Outbound<C>
+where
+    C: Clone + Send + Sync + Unpin + 'static,
+    C: svc::Service<tcp::Connect, Error = io::Error>,
+    C::Response: tls::HasNegotiatedProtocol,
+    C::Response: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin,
+    C::Future: Send + Unpin,
+{
     /// Routes HTTP requests according to the l5d-dst-override header.
     ///
     /// Forwards TCP connections without discovery/routing (or mTLS).
     ///
     /// This is only intended for Ingress configurations, where we assume all
     /// outbound traffic is either HTTP or TLS'd by the ingress proxy.
-    pub fn to_ingress<T, I, N, NSvc, H, HSvc, P>(
-        &self,
+    pub fn into_ingress<T, I, R, P>(
+        self,
+        resolve: R,
         profiles: P,
-        tcp: N,
-        http: H,
     ) -> impl svc::NewService<
         T,
         Service = impl svc::Service<I, Response = (), Error = Error, Future = impl Send>,
@@ -32,23 +41,56 @@ impl Outbound<()> {
     where
         T: Param<OrigDstAddr> + Param<Remote<ClientAddr>> + Clone + Send + Sync + 'static,
         I: io::AsyncRead + io::AsyncWrite + io::PeerAddr + std::fmt::Debug + Send + Unpin + 'static,
-        N: svc::NewService<tcp::Endpoint, Service = NSvc> + Clone + Send + Sync + 'static,
-        NSvc: svc::Service<io::PrefixedIo<transport::metrics::SensorIo<I>>, Response = ()>
-            + Clone
-            + Send
-            + Sync
-            + 'static,
-        NSvc::Error: Into<Error>,
-        NSvc::Future: Send,
-        H: svc::NewService<http::Logical, Service = HSvc> + Clone + Send + Sync + Unpin + 'static,
-        HSvc: svc::Service<http::Request<http::BoxBody>, Response = http::Response<http::BoxBody>>
-            + Send
-            + 'static,
-        HSvc::Error: Into<Error>,
-        HSvc::Future: Send,
         P: profiles::GetProfile<profiles::LookupAddr> + Clone + Send + Sync + Unpin + 'static,
         P::Error: Send,
         P::Future: Send,
+        R: Resolve<ConcreteAddr, Endpoint = Metadata, Error = Error>,
+        R: Clone + Unpin + Send + Sync + 'static,
+        R::Resolution: Send,
+        R::Future: Send + Unpin,
+    {
+        let tcp = self.clone().push_tcp_endpoint().into_inner();
+        let http = self.clone().push_tcp_endpoint().into_inner();
+        Outbound::new(self.config, self.runtime).into_ingress_with(resolve, profiles, http, tcp)
+    }
+}
+
+impl Outbound<()> {
+    /// Routes HTTP requests according to the l5d-dst-override header, with the
+    /// provided HTTP and raw TCP endpoint stacks.
+    ///
+    /// Forwards TCP connections without discovery/routing (or mTLS).
+    ///
+    /// This is only intended for Ingress configurations, where we assume all
+    /// outbound traffic is either HTTP or TLS'd by the ingress proxy.
+    pub fn into_ingress_with<T, I, N, H, P, R>(
+        self,
+        resolve: R,
+        profiles: P,
+        http_endpoint: H,
+        tcp_endpoint: N,
+    ) -> impl svc::NewService<
+        T,
+        Service = impl svc::Service<I, Response = (), Error = Error, Future = impl Send>,
+    >
+    where
+        T: Param<OrigDstAddr> + Param<Remote<ClientAddr>> + Clone + Send + Sync + 'static,
+        I: io::AsyncRead + io::AsyncWrite + io::PeerAddr + std::fmt::Debug + Send + Unpin + 'static,
+        H: svc::Service<http::Endpoint, Error = Error>,
+        H: Unpin + Clone + Send + Sync + 'static,
+        H::Response: io::AsyncRead + io::AsyncWrite + Send + Unpin + 'static,
+        H::Future: Unpin + Send + 'static,
+        N: svc::Service<tcp::Endpoint, Error = Error>,
+        N: Unpin + Clone + Send + Sync + 'static,
+        N::Response: io::AsyncRead + io::AsyncWrite + Send + Unpin + 'static,
+        N::Future: Send + 'static,
+        P: profiles::GetProfile<profiles::LookupAddr> + Clone + Send + Sync + Unpin + 'static,
+        P::Error: Send,
+        P::Future: Send,
+        R: Resolve<ConcreteAddr, Endpoint = Metadata, Error = Error>,
+        R: Clone + Unpin + Send + Sync + 'static,
+        R::Resolution: Send,
+        R::Future: Send + Unpin,
     {
         let Config {
             allow_discovery,
@@ -66,11 +108,20 @@ impl Outbound<()> {
         } = self.config.clone();
         let allow = AllowHttpProfile(allow_discovery);
 
-        let tcp = svc::stack(tcp)
+        let tcp = self
+            .clone()
+            .with_stack(tcp_endpoint)
+            .push_tcp_forward()
+            .into_stack()
             .push_on_response(drain::Retain::layer(self.runtime.drain.clone()))
             .push_map_target(|a: tcp::Accept| {
                 tcp::Endpoint::from((tls::NoClientTls::IngressNonHttp, a))
-            })
+            });
+        let http = self
+            .clone()
+            .with_stack(http_endpoint)
+            .push_http_endpoint()
+            .push_http_logical(resolve)
             .into_inner();
 
         svc::stack(http)
