@@ -143,7 +143,7 @@ mod http {
         let profiles = profile::resolver().profile(
             Addr::from(svc_addr.clone()),
             profile::Profile {
-                addr: Some(svc_addr.clone().into()),
+                endpoint: Some((ep2, meta)),
                 ..Default::default()
             },
         );
