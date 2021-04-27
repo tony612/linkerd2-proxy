@@ -56,11 +56,7 @@ where
         } = config.proxy;
 
         let identity_disabled = rt.identity.is_none();
-        // let no_tls_reason = if identity_disabled {
-        //     tls::NoClientTls::Disabled
-        // } else {
-        //     tls::NoClientTls::NotProvidedByServiceDiscovery
-        // };
+
         let resolve = svc::stack(resolve.into_service())
             .check_service::<ConcreteAddr>()
             .push_request_filter(|c: Concrete| Ok::<_, Never>(c.resolve))
@@ -69,17 +65,6 @@ where
             }))
             .check_service::<Concrete>()
             .into_inner();
-
-        // let endpoint = connect
-        //     .clone()
-        //     .push_make_thunk()
-        //     .instrument(|t: &Endpoint| debug_span!("tcp.forward", server.addr = %t.addr))
-        //     .push_on_response(
-        //         svc::layers()
-        //             .push(svc::MapErrLayer::new(Into::into))
-        //             .push(tcp::Forward::layer())
-        //             .push(drain::Retain::layer(rt.drain.clone())),
-        //     );
 
         let stack = connect
             .push_make_thunk()
@@ -123,7 +108,6 @@ where
             )
             .push_cache(cache_max_idle_age)
             .check_new_service::<Logical, I>()
-            // .push_switch(Logical::or_endpoint(no_tls_reason), endpoint.into_inner())
             .instrument(|_: &Logical| debug_span!("tcp"))
             .check_new_service::<Logical, I>();
 
