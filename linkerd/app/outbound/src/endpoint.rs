@@ -29,8 +29,8 @@ pub struct Endpoint<P> {
 /// This has to be a type, rather than a tuple, so that we can implement
 /// `Param<SkipHttpDetection>` for it.
 #[derive(Clone, Debug)]
-pub struct ProfileEndpoint {
-    endpoint: Endpoint<()>,
+pub struct ProfileEndpoint<P> {
+    pub(crate) endpoint: Endpoint<P>,
     opaque_protocol: bool,
 }
 
@@ -70,7 +70,7 @@ impl<N> Outbound<N> {
     /// Pushes a layer that checks if a discovered service profile contains an
     /// endpoint, and forwards directly to that endpoint (bypassing the current
     /// stack) if one exists.
-    pub fn push_profile_endpoint<T, E, ESvc, NSvc, Req>(
+    pub fn push_profile_endpoint<T, E, ESvc, NSvc, Req, P>(
         self,
         endpoint: E,
     ) -> Outbound<
@@ -83,9 +83,10 @@ impl<N> Outbound<N> {
         N: svc::NewService<(Option<profiles::Receiver>, T), Service = NSvc> + Clone,
         NSvc: svc::Service<Req, Error = Error>,
         NSvc::Future: Send,
-        E: svc::NewService<ProfileEndpoint, Service = ESvc> + Clone,
+        E: svc::NewService<ProfileEndpoint<P>, Service = ESvc> + Clone,
         ESvc: svc::Service<Req, Response = NSvc::Response, Error = Error>,
         ESvc::Future: Send,
+        T: Param<P> + std::fmt::Debug,
     {
         let Self {
             config,
@@ -105,7 +106,7 @@ impl<N> Outbound<N> {
                     let profiles::Profile { ref endpoint, ref opaque_protocol,.. } = *rx.borrow();
                     if let Some((addr, metadata)) = endpoint.clone() {
                         tracing::debug!(%addr, ?metadata, %opaque_protocol, "Using endpoint from profile");
-                        return Ok(svc::Either::B(ProfileEndpoint::new(addr, metadata, *opaque_protocol, identity_disabled)));
+                        return Ok(svc::Either::B(ProfileEndpoint::new(addr, metadata, *opaque_protocol, identity_disabled, target.param())));
                     }
                 }
 
@@ -283,20 +284,21 @@ impl<P: Copy + std::fmt::Debug> MapEndpoint<Concrete<P>, Metadata> for FromMetad
     }
 }
 
-impl From<ProfileEndpoint> for Endpoint<()> {
-    fn from(ProfileEndpoint { endpoint, .. }: ProfileEndpoint) -> Self {
+impl<P> From<ProfileEndpoint<P>> for Endpoint<P> {
+    fn from(ProfileEndpoint { endpoint, .. }: ProfileEndpoint<P>) -> Self {
         endpoint
     }
 }
 
 // === impl ProfileEndpoint ===
 
-impl ProfileEndpoint {
+impl<P> ProfileEndpoint<P> {
     fn new(
         addr: SocketAddr,
         metadata: Metadata,
         opaque_protocol: bool,
         identity_disabled: bool,
+        protocol: P,
     ) -> Self {
         let tls = if identity_disabled {
             tls::ConditionalClientTls::None(tls::NoClientTls::Disabled)
@@ -308,7 +310,7 @@ impl ProfileEndpoint {
             tls,
             metadata,
             logical_addr: None,
-            protocol: (),
+            protocol,
         };
         Self {
             endpoint,
@@ -318,13 +320,13 @@ impl ProfileEndpoint {
 }
 
 // Used for skipping HTTP detection for endpoint overrides
-impl svc::Param<SkipHttpDetection> for ProfileEndpoint {
+impl<P> svc::Param<SkipHttpDetection> for ProfileEndpoint<P> {
     fn param(&self) -> SkipHttpDetection {
         SkipHttpDetection(self.opaque_protocol)
     }
 }
 
-impl svc::Param<Remote<ServerAddr>> for ProfileEndpoint {
+impl<P> svc::Param<Remote<ServerAddr>> for ProfileEndpoint<P> {
     fn param(&self) -> Remote<ServerAddr> {
         self.endpoint.addr
     }

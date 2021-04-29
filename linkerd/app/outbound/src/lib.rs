@@ -197,18 +197,18 @@ impl Outbound<()> {
         // HTTP and TCP per-endpoint stack used when the service profile
         // has an endpoint override.
         let profile_endpoint = tcp_forward
-            .push_detect_http::<endpoint::ProfileEndpoint, _, _, _, _, _, _>(
+            .push_detect_http::<endpoint::ProfileEndpoint<()>, _, _, _, _, _, _>(
                 http_endpoint
                     .clone()
                     .push_http_server::<http::Endpoint, _>()
                     .into_inner(),
             )
             .into_stack()
-            .instrument(|ep: &endpoint::ProfileEndpoint| {
+            .instrument(|ep: &endpoint::ProfileEndpoint<()>| {
                 let addr: Remote<ServerAddr> = ep.param();
                 tracing::debug_span!("endpoint", %addr)
             })
-            .check_new_service::<endpoint::ProfileEndpoint, _>()
+            .check_new_service::<endpoint::ProfileEndpoint<()>, _>()
             .into_inner();
 
         // HTTP stack for logical targets (with service profiles).

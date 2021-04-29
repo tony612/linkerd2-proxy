@@ -107,9 +107,9 @@ mod http {
             .header("l5d-dst-override", "foo.ns1.svc.cluster.local:5550")
             .body(Default::default())
             .expect("request should be valid");
-        let rsp = http_util::http_request(&mut client, req).await;
+        let rsp = http_util::http_request(&mut client, req).await.unwrap();
         assert_eq!(rsp.status(), http::StatusCode::OK);
-        let body = http_util::body_to_string(rsp.into_body()).await;
+        let body = http_util::body_to_string(rsp.into_body()).await.unwrap();
         assert_eq!(body, "Hello world!");
 
         drop(client);
@@ -159,9 +159,9 @@ mod http {
             .header("l5d-dst-override", "foo.ns1.svc.cluster.local:5550")
             .body(Default::default())
             .expect("request should be valid");
-        let rsp = http_util::http_request(&mut client, req).await;
+        let rsp = http_util::http_request(&mut client, req).await.unwrap();
         assert_eq!(rsp.status(), http::StatusCode::OK);
-        let body = http_util::body_to_string(rsp.into_body()).await;
+        let body = http_util::body_to_string(rsp.into_body()).await.unwrap();
         assert_eq!(body, "Hello world!");
 
         drop(client);

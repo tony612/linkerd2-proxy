@@ -1,4 +1,4 @@
-use crate::{http, stack_labels, tcp, trace_labels, Config, Outbound};
+use crate::{http, logical::LogicalAddr, stack_labels, tcp, trace_labels, Config, Outbound};
 use linkerd_app_core::{
     config::{ProxyConfig, ServerConfig},
     detect, discovery_rejected, drain, errors, http_request_l5d_override_dst_addr, http_tracing,
@@ -120,19 +120,26 @@ impl Outbound<()> {
             .push_map_target(|a: tcp::Accept| {
                 tcp::Endpoint::from((tls::NoClientTls::IngressNonHttp, a))
             });
-        let http = self
-            .clone()
-            .with_stack(http_endpoint)
-            .push_http_endpoint()
-            .push_http_logical(resolve)
-            .into_inner();
 
-        svc::stack(http)
+        let http_endpoint = self.clone().with_stack(http_endpoint).push_http_endpoint();
+        let http_profile_endpoint = http_endpoint
+            .clone()
+            .into_stack()
+            .push_map_target(http::Endpoint::from)
             .push_on_response(
                 svc::layers()
                     .push(http::BoxRequest::layer())
                     .push(svc::MapErrLayer::new(Into::<Error>::into)),
             )
+            .into_inner();
+
+        let http_logical = http_endpoint
+            .push_http_logical(resolve)
+            .push(svc::stack::OnResponseLayer::new(
+                svc::layers()
+                    .push(http::BoxRequest::layer())
+                    .push(svc::MapErrLayer::new(Into::<Error>::into)),
+            ))
             // Lookup the profile for the outbound HTTP target, if appropriate.
             //
             // This service is buffered because it needs to initialize the profile
@@ -141,7 +148,11 @@ impl Outbound<()> {
             // When this service is in failfast, ensure that we drive the
             // inner service to readiness even if new requests aren't
             // received.
-            .push_request_filter(http::Logical::try_from)
+            .push(svc::stack::FilterLayer::new(http::Logical::try_from))
+            .push_profile_endpoint(http_profile_endpoint);
+
+        http_logical
+            .into_stack()
             .check_new_service::<(Option<profiles::Receiver>, Target), _>()
             .push(profiles::discover::layer(profiles, allow))
             .push_on_response(
@@ -270,9 +281,15 @@ impl From<(tls::NoClientTls, Target)> for http::Endpoint {
             addr,
             metadata: Metadata::default(),
             tls: Conditional::None(reason),
-            logical_addr,
+            logical_addr: dst.name_addr().map(|name| LogicalAddr(name.clone())),
             protocol: version,
         }
+    }
+}
+
+impl Param<http::Version> for Target {
+    fn param(&self) -> http::Version {
+        self.version
     }
 }
 
