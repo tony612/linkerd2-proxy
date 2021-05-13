@@ -55,7 +55,7 @@ pub struct ClientInfo {
 type FwdIo<I> = io::PrefixedIo<SensorIo<tls::server::Io<I>>>;
 pub type GatewayIo<I> = io::EitherIo<FwdIo<I>, SensorIo<tls::server::Io<I>>>;
 
-#[cfg(feature = "disabled")]
+// #[cfg(feature = "disabled")]
 impl<N> Inbound<N> {
     /// Builds a stack that handles connections that target the proxy's inbound port
     /// (i.e. without an SO_ORIGINAL_DST setting). This port behaves differently from

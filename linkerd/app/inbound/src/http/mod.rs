@@ -24,30 +24,30 @@ use linkerd_app_core::{
 use tracing::debug_span;
 
 impl<H> Inbound<H> {
-    #[cfg(not(feature = "disabled"))]
-    pub fn push_http_server<T, I>(
-        self,
-    ) -> Inbound<
-        impl svc::NewService<
-                T,
-                Service = impl svc::Service<I, Response = (), Error = Error, Future = impl Send> + Clone,
-            > + Clone,
-    >
-    where
-        H: svc::NewService<T>,
-    {
-        #[derive(Debug, Default, thiserror::Error)]
-        #[error("unimplemented")]
-        struct Unimpl;
+    //    #[cfg(not(feature = "disabled"))]
+    //     pub fn push_http_server<T, I>(
+    //         self,
+    //     ) -> Inbound<
+    //         impl svc::NewService<
+    //                 T,
+    //                 Service = impl svc::Service<I, Response = (), Error = Error, Future = impl Send> + Clone,
+    //             > + Clone,
+    //     >
+    //     where
+    //         H: svc::NewService<T>,
+    //     {
+    //         #[derive(Debug, Default, thiserror::Error)]
+    //         #[error("unimplemented")]
+    //         struct Unimpl;
 
-        Inbound {
-            config: self.config,
-            runtime: self.runtime,
-            stack: svc::stack(svc::Fail::<_, Unimpl>::default()),
-        }
-    }
+    //         Inbound {
+    //             config: self.config,
+    //             runtime: self.runtime,
+    //             stack: svc::stack(svc::Fail::<_, Unimpl>::default()),
+    //         }
+    //     }
 
-    #[cfg(feature = "disabled")]
+    //     #[cfg(feature = "disabled")]'
     pub fn push_http_server<T, I, HSvc>(
         self,
     ) -> Inbound<
