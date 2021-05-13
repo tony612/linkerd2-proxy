@@ -156,8 +156,7 @@ impl<E> Outbound<E> {
             .instrument(|l: &Logical| debug_span!("logical", dst = %l.logical_addr))
             // Boxing is necessary purely to limit the link-time overhead of
             // having enormous types.
-            .push_on_response(svc::BoxService::layer())
-            .push(svc::BoxNewService::layer());
+            .push_box();
 
         Outbound {
             config,

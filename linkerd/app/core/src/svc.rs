@@ -106,6 +106,26 @@ impl<S> Stack<S> {
         Stack(layer.layer(self.0))
     }
 
+    #[allow(clippy::type_complexity)] // lol
+    pub fn push_box<T, R>(
+        self,
+    ) -> Stack<
+        stack::BoxNewService<
+            T,
+            BoxService<R, <S::Service as Service<R>>::Response, <S::Service as Service<R>>::Error>,
+        >,
+    >
+    where
+        S: NewService<T> + Clone + Send + Sync + 'static,
+        S::Service: Service<R> + Send + 'static,
+        <S::Service as Service<R>>::Future: Send + 'static,
+        <S::Service as Service<R>>::Error: Send + 'static,
+        R: 'static,
+    {
+        self.push_on_response(stack::BoxServiceLayer::new())
+            .push(stack::BoxNewService::layer())
+    }
+
     pub fn push_map_target<M: Clone>(self, map_target: M) -> Stack<stack::MapTargetService<S, M>> {
         self.push(stack::MapTargetLayer::new(map_target))
     }

@@ -235,7 +235,7 @@ where
             .push_http_router(profiles)
             .push_http_server()
             .stack
-            .push_on_response(svc::BoxService::layer())
+            .push_box()
             .push_map_target(HttpAccept::from)
             .push(svc::UnwrapOr::layer(
                 // When HTTP detection fails, forward the connection to the
@@ -290,7 +290,7 @@ where
                 let OrigDstAddr(target_addr) = a.param();
                 info_span!("server", port = target_addr.port())
             })
-            .push(svc::BoxNewService::layer())
+            .push_box()
             .into_inner()
     }
 }
