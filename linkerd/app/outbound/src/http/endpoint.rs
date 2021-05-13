@@ -8,6 +8,38 @@ use linkerd_app_core::{
 use tokio::io;
 
 impl<C> Outbound<C> {
+    #[cfg(not(feature = "disabled"))]
+    pub fn push_http_endpoint<T>(
+        self,
+    ) -> Outbound<
+        impl svc::NewService<
+                T,
+                Service = impl svc::Service<
+                    http::Request<http::BoxBody>,
+                    Response = http::Response<http::BoxBody>,
+                    Error = Error,
+                    Future = impl Send,
+                >,
+            > + Clone
+            + Send
+            + Sync
+            + 'static,
+    >
+    where
+        C: svc::Service<T>,
+    {
+        #[derive(Debug, Default, thiserror::Error)]
+        #[error("unimplemented")]
+        struct Unimpl;
+
+        Outbound {
+            config: self.config,
+            runtime: self.runtime,
+            stack: svc::stack(svc::Fail::<_, Unimpl>::default()),
+        }
+    }
+
+    #[cfg(feature = "disabled")]
     pub fn push_http_endpoint<T, B>(
         self,
     ) -> Outbound<

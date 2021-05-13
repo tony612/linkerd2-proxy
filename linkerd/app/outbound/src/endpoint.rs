@@ -190,6 +190,7 @@ impl<P: Copy + std::fmt::Debug> MapEndpoint<Concrete<P>, Metadata> for FromMetad
 
 // === Outbound ===
 
+#[cfg(feature = "disabled")]
 impl<S> Outbound<S> {
     pub fn push_endpoint<I>(
         self,

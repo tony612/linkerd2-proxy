@@ -12,6 +12,7 @@ impl<N> Outbound<N> {
     /// Discovers the profile for a TCP endpoint.
     ///
     /// Resolved services are cached and buffered.
+    #[cfg(feature = "disabled")]
     pub fn push_discover<T, I, NSvc, P>(
         self,
         profiles: P,

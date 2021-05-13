@@ -10,6 +10,7 @@ use tracing::debug_span;
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Skip;
 
+#[cfg(feature = "disabled")]
 impl<N> Outbound<N> {
     pub fn push_detect_http<T, U, NSvc, H, HSvc, I>(
         self,

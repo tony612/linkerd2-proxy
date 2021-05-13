@@ -43,6 +43,7 @@ impl<H> Outbound<H> {
     ///
     /// This is only intended for Ingress configurations, where we assume all
     /// outbound traffic is HTTP.
+    #[cfg(feature = "disabled")]
     pub fn into_ingress<T, I, HSvc, P>(
         self,
         profiles: P,

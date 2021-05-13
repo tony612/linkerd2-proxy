@@ -2,6 +2,7 @@ use crate::{endpoint::Endpoint, logical::Logical, tcp, transport::OrigDstAddr, O
 use linkerd_app_core::{io, profiles, svc, Error, Never};
 use std::fmt;
 
+#[cfg(feature = "disabled")]
 impl<S> Outbound<S> {
     /// Wraps an endpoint stack to switch to an alternate logical stack when an appropriate profile
     /// is provided:

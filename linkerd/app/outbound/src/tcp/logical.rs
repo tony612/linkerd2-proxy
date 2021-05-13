@@ -12,14 +12,33 @@ use linkerd_app_core::{
 };
 use tracing::debug_span;
 
-impl<C> Outbound<C>
-where
-    C: svc::Service<Endpoint> + Clone + Send + 'static,
-    C::Response: io::AsyncRead + io::AsyncWrite + Send + Unpin,
-    C::Error: Into<Error>,
-    C::Future: Send,
-{
+impl<C> Outbound<C> {
+    #[cfg(not(feature = "disabled"))]
+    pub fn push_tcp_logical<I, R>(
+        self,
+        resolve: R,
+    ) -> Outbound<
+        impl svc::NewService<
+                Logical,
+                Service = impl svc::Service<I, Response = (), Error = Error, Future = impl Send> + Clone,
+            > + Clone,
+    >
+    where
+        C: svc::Service<Endpoint> + Clone + Send + Sync + 'static,
+    {
+        #[derive(Debug, Default, thiserror::Error)]
+        #[error("unimplemented")]
+        struct Unimpl;
+
+        Outbound {
+            config: self.config,
+            runtime: self.runtime,
+            stack: svc::stack(svc::Fail::<_, Unimpl>::default()),
+        }
+    }
+
     /// Constructs a TCP load balancer.
+    #[cfg(feature = "disabled")]
     pub fn push_tcp_logical<I, R>(
         self,
         resolve: R,
@@ -38,7 +57,10 @@ where
             + 'static,
         R::Resolution: Send,
         R::Future: Send + Unpin,
-        C: Send + Sync + 'static,
+        C: svc::Service<Endpoint> + Clone + Send + Sync + 'static,
+        C::Response: io::AsyncRead + io::AsyncWrite + Send + Unpin,
+        C::Error: Into<Error>,
+        C::Future: Send,
     {
         let Self {
             config,
