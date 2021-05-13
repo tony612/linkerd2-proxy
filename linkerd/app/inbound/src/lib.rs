@@ -5,6 +5,7 @@
 
 #![deny(warnings, rust_2018_idioms)]
 #![allow(clippy::inconsistent_struct_constructor)]
+#![allow(warnings)]
 
 mod allow_discovery;
 pub mod direct;
@@ -206,6 +207,23 @@ where
         }
     }
 
+    #[cfg(not(feature = "disabled"))]
+    pub fn into_server<T, I, G, P>(
+        self,
+        _server_port: u16,
+        _profiles: P,
+        _gateway: G,
+    ) -> impl svc::NewService<
+        T,
+        Service = impl svc::Service<I, Response = (), Error = Error, Future = impl Send>,
+    > + Clone {
+        #[derive(Debug, Default, thiserror::Error)]
+        #[error("unimplemented")]
+        struct Unimpl;
+        svc::Fail::<_, Unimpl>::default()
+    }
+
+    #[cfg(feature = "disabled")]
     pub fn into_server<T, I, G, GSvc, P>(
         self,
         server_port: u16,

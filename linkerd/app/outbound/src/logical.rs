@@ -114,6 +114,28 @@ impl<P> svc::Param<ConcreteAddr> for Concrete<P> {
 // === impl Outbound ===
 
 impl<C> Outbound<C> {
+    #[cfg(not(feature = "disabled"))]
+    pub fn push_logical<R, I>(
+        self,
+        resolve: R,
+    ) -> Outbound<
+        impl svc::NewService<
+                tcp::Logical,
+                Service = impl svc::Service<I, Response = (), Error = Error, Future = impl Send>,
+            > + Clone,
+    > {
+        #[derive(Debug, Default, thiserror::Error)]
+        #[error("unimplemented")]
+        struct Unimpl;
+
+        Outbound {
+            config: self.config,
+            runtime: self.runtime,
+            stack: svc::stack(svc::Fail::<_, Unimpl>::default()),
+        }
+    }
+
+    #[cfg(feature = "disabled")]
     pub fn push_logical<R, I>(
         self,
         resolve: R,

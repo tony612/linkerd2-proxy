@@ -4,6 +4,7 @@
 
 #![deny(warnings, rust_2018_idioms)]
 #![allow(clippy::inconsistent_struct_constructor)]
+#![allow(warnings)]
 
 mod discover;
 pub mod endpoint;
@@ -114,6 +115,24 @@ impl<S> Outbound<S> {
 }
 
 impl Outbound<()> {
+    #[cfg(not(feature = "disabled"))]
+    pub fn serve<B, P, R>(
+        self,
+        bind: B,
+        profiles: P,
+        resolve: R,
+    ) -> (Local<ServerAddr>, impl Future<Output = ()>)
+    where
+        B: Bind<ServerConfig>,
+    {
+        let (listen_addr, _) = bind
+            .bind(&self.config.proxy.server)
+            .expect("Failed to bind outbound listener");
+
+        (listen_addr, futures::future::pending())
+    }
+
+    #[cfg(feature = "disabled")]
     pub fn serve<B, P, R>(
         self,
         bind: B,
