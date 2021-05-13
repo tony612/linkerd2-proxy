@@ -138,7 +138,8 @@ impl<H> Outbound<H> {
                 .push(rt.metrics.http_errors.clone())
                 .push(errors::layer())
                 .push(http_tracing::server(rt.span_sink, trace_labels()))
-                .push(http::BoxResponse::layer()),
+                .push(http::BoxResponse::layer())
+                .push(svc::BoxFuture::layer()),
         )
         .instrument(|a: &http::Accept| debug_span!("http", v = %a.protocol))
         .push(http::NewServeHttp::layer(h2_settings, rt.drain))

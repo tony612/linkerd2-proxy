@@ -98,7 +98,8 @@ impl<E> Outbound<E> {
                     .push(rt.metrics.stack.layer(stack_labels("http", "balancer")))
                     .push(svc::layer::mk(svc::SpawnReady::new))
                     .push(svc::FailFast::layer("HTTP Balancer", dispatch_timeout))
-                    .push(http::BoxResponse::layer()),
+                    .push(http::BoxResponse::layer())
+                    .push(svc::BoxFuture::layer()),
             )
             .check_make_service::<Concrete, http::Request<_>>()
             .push(svc::MapErrLayer::new(Into::into))
@@ -144,6 +145,7 @@ impl<E> Outbound<E> {
                     .push_map_target(Logical::mk_route)
                     .into_inner(),
             ))
+            .push_on_response(svc::BoxFuture::layer())
             // Strips headers that may be set by this proxy and add an outbound
             // canonical-dst-header. The response body is boxed unify the profile
             // stack's response type. withthat of to endpoint stack.

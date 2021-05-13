@@ -4,8 +4,8 @@ pub use crate::proxy::http;
 use crate::{cache, Error};
 pub use linkerd_concurrency_limit::ConcurrencyLimit;
 pub use linkerd_stack::{
-    self as stack, layer, BoxNewService, BoxService, BoxServiceLayer, Fail, Filter, MapTargetLayer,
-    NewRouter, NewService, Param, Predicate, UnwrapOr,
+    self as stack, layer, BoxFuture, BoxNewService, BoxService, BoxServiceLayer, Fail, Filter,
+    MapTargetLayer, NewRouter, NewService, Param, Predicate, UnwrapOr,
 };
 pub use linkerd_stack_tracing::{NewInstrument, NewInstrumentLayer};
 pub use linkerd_timeout::{self as timeout, FailFast};
