@@ -232,8 +232,7 @@ where
         )
         .push_http_server()
         .into_stack()
-        .push_on_response(svc::BoxService::layer())
-        .push(svc::BoxNewService::layer())
+        .push_box()
         .push_switch(
             |GatewayTransportHeader {
                  target,
@@ -250,19 +249,14 @@ where
                 })),
                 None => Ok::<_, Never>(svc::Either::B(target)),
             },
-            tcp.push_on_response(svc::BoxService::layer())
-                .push(svc::BoxNewService::layer())
-                .into_inner(),
+            tcp.push_box().into_inner(),
         )
         .push_switch(
             |gw| match gw {
                 GatewayConnection::TransportHeader(t) => Ok::<_, Never>(svc::Either::A(t)),
                 GatewayConnection::Legacy(c) => Ok(svc::Either::B(c)),
             },
-            legacy_http
-                .push_on_response(svc::BoxService::layer())
-                .push(svc::BoxNewService::layer())
-                .into_inner(),
+            legacy_http.push_box().into_inner(),
         )
         .into_inner()
 }
