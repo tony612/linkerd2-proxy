@@ -253,8 +253,9 @@ where
             .push_http_router(profiles)
             .push_http_server()
             .stack
-            .push_on_response(svc::BoxService::layer())
             .push_map_target(HttpAccept::from)
+            .push_on_response(svc::BoxService::layer())
+            .push(svc::BoxNewService::layer())
             .push(svc::UnwrapOr::layer(
                 // When HTTP detection fails, forward the connection to the
                 // application as an opaque TCP stream.
@@ -280,6 +281,7 @@ where
             ))
             .instrument(|_: &_| debug_span!("proxy"))
             .push_on_response(svc::BoxService::layer())
+            .push(svc::BoxNewService::layer())
             .push_switch(
                 disable_detect,
                 self.clone()
@@ -302,6 +304,7 @@ where
                     .stack
                     .instrument(|_: &_| debug_span!("direct"))
                     .push_on_response(svc::BoxService::layer())
+                    .push(svc::BoxNewService::layer())
                     .into_inner(),
             )
             .instrument(|a: &T| {
