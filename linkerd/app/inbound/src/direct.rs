@@ -105,6 +105,8 @@ impl<N> Inbound<N> {
             // TCP forwarding, or we may be processing an HTTP gateway connection.
             // HTTP gateway connections that have a transport header must provide a
             // target name as a part of the header.
+            .push_on_response(svc::BoxService::layer())
+            .push(svc::BoxNewService::layer())
             .push_switch(
                 |(h, client): (TransportHeader, ClientInfo)| match h {
                     TransportHeader {
@@ -133,6 +135,8 @@ impl<N> Inbound<N> {
                     .push_on_response(svc::MapTargetLayer::new(io::EitherIo::Left))
                     .push_map_target(GatewayConnection::TransportHeader)
                     .instrument(|g: &GatewayTransportHeader| info_span!("gateway", dst = %g.target))
+                    .push_on_response(svc::BoxService::layer())
+                    .push(svc::BoxNewService::layer())
                     .into_inner(),
             )
             // Use ALPN to determine whether a transport header should be read.
@@ -140,6 +144,8 @@ impl<N> Inbound<N> {
             // When the transport header is not present, perform HTTP detection to
             // support legacy gateway clients.
             .push(NewTransportHeaderServer::layer(detect_timeout))
+            .push_on_response(svc::BoxService::layer())
+            .push(svc::BoxNewService::layer())
             .push_switch(
                 |client: ClientInfo| {
                     if client.header_negotiated() {
@@ -153,6 +159,8 @@ impl<N> Inbound<N> {
                 svc::stack(gateway)
                     .push_on_response(svc::MapTargetLayer::new(io::EitherIo::Right))
                     .instrument(|_: &GatewayConnection| info_span!("gateway", legacy = true))
+                    .push_on_response(svc::BoxService::layer())
+                    .push(svc::BoxNewService::layer())
                     .into_inner(),
             )
             .push(rt.metrics.transport.layer_accept())
@@ -163,6 +171,8 @@ impl<N> Inbound<N> {
                 rt.identity.clone().map(WithTransportHeaderAlpn),
                 detect_timeout,
             ))
+            .push_on_response(svc::BoxService::layer())
+            .push(svc::BoxNewService::layer())
             .check_new_service::<T, I>();
 
         Inbound {
