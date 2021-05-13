@@ -113,7 +113,10 @@ impl<H> Inbound<H> {
             )
             .check_new_service::<T, http::Request<_>>()
             .instrument(|t: &T| debug_span!("http", v=%Param::<Version>::param(t)))
-            .push(http::NewServeHttp::layer(h2_settings, rt.drain.clone()));
+            .push(http::NewServeHttp::layer(h2_settings, rt.drain.clone()))
+            // NOTE(eliza): can't box the Service impl here because it needs to be `Clone`...
+            .push_on_response(svc::stack::BoxFuture::layer())
+            .push(svc::BoxNewService::layer());
 
         Inbound {
             config,
