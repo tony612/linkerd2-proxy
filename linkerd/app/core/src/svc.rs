@@ -201,36 +201,154 @@ impl<S> Stack<S> {
     }
 
     /// Validates that this stack serves T-typed targets.
+    #[track_caller]
     pub fn check_new<T>(self) -> Self
     where
         S: NewService<T>,
     {
+        #[cfg(dump_stacks)]
+        {
+            use std::any::type_name;
+
+            let s_name = type_name::<S>();
+            let svc_name = type_name::<S::Service>();
+            eprintln!(
+                "\ncheck_new::<{}>\n  at {}",
+                type_name::<T>(),
+                std::panic::Location::caller()
+            );
+            eprintln!(
+                "  new service: {:>5} chars, {:>5} angles",
+                s_name.len(),
+                s_name.matches('<').count()
+            );
+            eprintln!(
+                "      service: {:>5} chars, {:>5} angles",
+                svc_name.len(),
+                svc_name.matches('<').count()
+            );
+        }
         self
     }
 
+    #[track_caller]
     pub fn check_new_clone<T>(self) -> Self
     where
         S: NewService<T>,
         S::Service: Clone,
     {
+        #[cfg(dump_stacks)]
+        {
+            use std::any::type_name;
+
+            let s_name = type_name::<S>();
+            let svc_name = type_name::<S::Service>();
+            eprintln!(
+                "\ncheck_new_clone::<{}>\n  at {}",
+                type_name::<T>(),
+                std::panic::Location::caller()
+            );
+            eprintln!(
+                "  new service: {:>5} chars, {:>5} angles",
+                s_name.len(),
+                s_name.matches('<').count()
+            );
+            eprintln!(
+                "      service: {:>5} chars, {:>5} angles",
+                svc_name.len(),
+                svc_name.matches('<').count()
+            );
+        }
         self
     }
 
     /// Validates that this stack serves T-typed targets.
+    #[track_caller]
     pub fn check_new_service<T, Req>(self) -> Self
     where
         S: NewService<T>,
         S::Service: Service<Req>,
     {
+        #[cfg(dump_stacks)]
+        {
+            use std::any::type_name;
+
+            let s_name = type_name::<S>();
+            let svc_name = type_name::<S::Service>();
+            let fut_name = type_name::<<S::Service as Service<Req>>::Future>();
+            let rsp_name = type_name::<<S::Service as Service<Req>>::Response>();
+            eprintln!(
+                "\ncheck_new_service::<{}, {}>\n at {}",
+                type_name::<T>(),
+                type_name::<Req>(),
+                std::panic::Location::caller()
+            );
+            eprintln!(
+                "  new service: {:>5} chars, {:>5} angles",
+                s_name.len(),
+                s_name.matches('<').count()
+            );
+            eprintln!(
+                "      service: {:>5} chars, {:>5} angles",
+                svc_name.len(),
+                svc_name.matches('<').count()
+            );
+            eprintln!(
+                "       future: {:>5} chars, {:>5} angles",
+                fut_name.len(),
+                fut_name.matches('<').count()
+            );
+            eprintln!(
+                "     response: {:>5} chars, {:>5} angles",
+                rsp_name.len(),
+                rsp_name.matches('<').count()
+            );
+        }
         self
     }
 
     /// Validates that this stack serves T-typed targets.
+    #[track_caller]
     pub fn check_clone_new_service<T, Req>(self) -> Self
     where
         S: NewService<T> + Clone,
         S::Service: Service<Req>,
     {
+        #[cfg(dump_stacks)]
+        {
+            use std::any::type_name;
+
+            let s_name = type_name::<S>();
+            let svc_name = type_name::<S::Service>();
+            let fut_name = type_name::<<S::Service as Service<Req>>::Future>();
+            let rsp_name = type_name::<<S::Service as Service<Req>>::Response>();
+            eprintln!(
+                "\ncheck_clone_new_service::<{}, {}>\n at {}",
+                type_name::<T>(),
+                type_name::<Req>(),
+                std::panic::Location::caller()
+            );
+            eprintln!(
+                "  new service: {:>5} chars, {:>5} angles",
+                s_name.len(),
+                s_name.matches('<').count()
+            );
+            eprintln!(
+                "      service: {:>5} chars, {:>5} angles",
+                svc_name.len(),
+                svc_name.matches('<').count()
+            );
+            eprintln!(
+                "       future: {:>5} chars, {:>5} angles",
+                fut_name.len(),
+                fut_name.matches('<').count()
+            );
+            eprintln!(
+                "     response: {:>5} chars, {:>5} angles",
+                rsp_name.len(),
+                rsp_name.matches('<').count()
+            );
+        }
         self
     }
 
@@ -243,26 +361,114 @@ impl<S> Stack<S> {
     }
 
     /// Validates that this stack serves T-typed targets.
+    #[track_caller]
     pub fn check_service<T>(self) -> Self
     where
         S: Service<T>,
     {
+        #[cfg(dump_stacks)]
+        {
+            use std::any::type_name;
+
+            let svc_name = type_name::<S>();
+            let fut_name = type_name::<S::Future>();
+            let rsp_name = type_name::<S::Response>();
+            eprintln!(
+                "\ncheck_service::<{}>\n at {}",
+                type_name::<T>(),
+                std::panic::Location::caller()
+            );
+            eprintln!(
+                "      service: {:>5} chars, {:>5} angles",
+                svc_name.len(),
+                svc_name.matches('<').count()
+            );
+            eprintln!(
+                "       future: {:>5} chars, {:>5} angles",
+                fut_name.len(),
+                fut_name.matches('<').count()
+            );
+            eprintln!(
+                "     response: {:>5} chars, {:>5} angles",
+                rsp_name.len(),
+                rsp_name.matches('<').count()
+            );
+        }
         self
     }
 
     /// Validates that this stack serves T-typed targets with `Unpin` futures.
+    #[track_caller]
     pub fn check_service_unpin<T>(self) -> Self
     where
         S: Service<T>,
         S::Future: Unpin,
     {
+        #[cfg(dump_stacks)]
+        {
+            use std::any::type_name;
+
+            let svc_name = type_name::<S>();
+            let fut_name = type_name::<S::Future>();
+            let rsp_name = type_name::<S::Response>();
+            eprintln!(
+                "\ncheck_service_unpin::<{}>\n at {}",
+                type_name::<T>(),
+                std::panic::Location::caller()
+            );
+            eprintln!(
+                "      service: {:>5} chars, {:>5} angles",
+                svc_name.len(),
+                svc_name.matches('<').count()
+            );
+            eprintln!(
+                "       future: {:>5} chars, {:>5} angles",
+                fut_name.len(),
+                fut_name.matches('<').count()
+            );
+            eprintln!(
+                "     response: {:>5} chars, {:>5} angles",
+                rsp_name.len(),
+                rsp_name.matches('<').count()
+            );
+        }
         self
     }
 
+    #[track_caller]
     pub fn check_service_response<T, U>(self) -> Self
     where
         S: Service<T, Response = U>,
     {
+        #[cfg(dump_stacks)]
+        {
+            use std::any::type_name;
+
+            let svc_name = type_name::<S>();
+            let fut_name = type_name::<S::Future>();
+            let rsp_name = type_name::<U>();
+            eprintln!(
+                "\ncheck_service_response::<{}, {}>\n at {}",
+                type_name::<T>(),
+                rsp_name,
+                std::panic::Location::caller()
+            );
+            eprintln!(
+                "      service: {:>5} chars, {:>5} angles",
+                svc_name.len(),
+                svc_name.matches('<').count()
+            );
+            eprintln!(
+                "       future: {:>5} chars, {:>5} angles",
+                fut_name.len(),
+                fut_name.matches('<').count()
+            );
+            eprintln!(
+                "     response: {:>5} chars, {:>5} angles",
+                rsp_name.len(),
+                rsp_name.matches('<').count()
+            );
+        }
         self
     }
 
