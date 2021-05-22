@@ -48,13 +48,17 @@ jobs:
       - name: Instal Linkerd in cluster
         run: |
           ./target/bin/linkerd check --pre
+
           ./target/bin/linkerd install \
                 --set controllerImage=ghcr.io/linkerd/controller \
                 --set proxyImage=ghcr.io/linkerd/proxy \
                 --set proxyInitImage=ghcr.io/linkerd/proxy-init \
               | ./target/bin/kubectl apply -f -
-          sleep 60
-          ./target/bin/linkerd check --wait=5m
+
+          for i in $(seq 1 9); do
+            ./target/bin/linkerd check --wait=1m || ./target/bin/kubectl get po - linkerd
+          done
+          ./target/bin/linkerd check --wait=1m
 
 
       - name: Run tests
