@@ -28,22 +28,16 @@ jobs:
       - name: Install tools
         run: |
           mkdir -p ./target/bin
-          curl -vsLo ./target/bin/kubectl "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
-          chmod 755 ./target/bin/kubectl
-          curl -vsLo ./target/bin/k3d "https://github.com/rancher/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
-          chmod 755 ./target/bin/k3d
-          curl -vsLo ./target/bin/linkerd "https://github.com/linkerd/linkerd2/releases/download/${LINKERD_VERSION}/linkerd2-cli-${LINKERD_VERSION}-linux-amd64"
-          chmod 755 ./target/bin/linkerd
+          cd ./target/bin
+          curl -vsLo kubectl "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          chmod 755 kubectl
+          curl -vsLo k3d "https://github.com/rancher/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
+          chmod 755 k3d
+          curl -vsLo linkerd "https://github.com/linkerd/linkerd2/releases/download/${LINKERD_VERSION}/linkerd2-cli-${LINKERD_VERSION}-linux-amd64"
+          chmod 755 linkerd
 
-      # Build a docker image for the working proxy, based on a recent Linkerd version for its
-      # runtime image.
-      - name: Docker
-        run: RUNTIME_IMAGE=ghcr.io/linkerd/proxy:${LINKERD_VERSION} DOCKER_TAG=${PROXY_IMAGE}:${GITHUB_SHA} make docker
-
-      - name: Setup cluster
-        run: |
-          ./target/bin/k3d cluster create
-          ./target/bin/k3d image import ${PROXY_IMAGE}:${GITHUB_SHA}
+      - name: Create cluster
+        run: ./target/bin/k3d cluster create
 
       - name: Instal Linkerd in cluster
         run: |
@@ -55,13 +49,21 @@ jobs:
                 --set proxyInitImage=ghcr.io/linkerd/proxy-init \
               | ./target/bin/kubectl apply -f -
 
-          for i in $(seq 1 9); do
-            ./target/bin/linkerd check --wait=1m || ./target/bin/kubectl get po -n linkerd
+          for i in $(seq 1 10); do
+            if ./target/bin/linkerd check --wait=1m; then
+              exit 0
+            fi
+            ./target/bin/kubectl get po -n linkerd
           done
-          ./target/bin/linkerd check --wait=1m
 
+      # Build a docker image for the working proxy, based on a recent Linkerd version for its
+      # runtime image.
+      - name: Build proxy
+        run: |
+          RUNTIME_IMAGE=ghcr.io/linkerd/proxy:${LINKERD_VERSION} DOCKER_TAG=${PROXY_IMAGE}:${GITHUB_SHA} make docker
+          k3d image import ${PROXY_IMAGE}:${GITHUB_SHA}
 
       - name: Run tests
         run: |
           ./target/bin/kubectl get po -A
-          # TODO
+          exit 1 TODO
