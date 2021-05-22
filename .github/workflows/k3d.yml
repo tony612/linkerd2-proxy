@@ -28,8 +28,8 @@ jobs:
         run:
           # Build a docker image for the working proxy, based on a recent Linkerd version for its
           # runtime image.
-          DOCKER_TAG="linkerd-ci/linkerd/proxy:${GITHUB_SHA}" \
-          RUNTIME_IMAGE="ghcr.io/linkerd/proxy:${LINKERD_VERSION}" \
+          export DOCKER_TAG="linkerd-ci/linkerd/proxy:${GITHUB_SHA}"
+          export RUNTIME_IMAGE="ghcr.io/linkerd/proxy:${LINKERD_VERSION}"
           make docker
 
       - name: Install tools
