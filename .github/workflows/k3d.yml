@@ -43,7 +43,7 @@ jobs:
           curl -sLo ./k3d "https://github.com/rancher/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
           chmod 755 ./k3d
 
-      - name: Install linkerd
+      - name: Install linkerd CLI
         run:
           curl -sLo ./linkerd "https://github.com/linkerd/linkerd2/releases/download/${LINKERD_VERSION}/linkerd2-cli-${LINKERD_VERSION}-linux-amd64"
           chmod 755 ./linkerd
@@ -51,9 +51,9 @@ jobs:
       - name: Setup cluster
         run:
           ./k3d cluster create
-          ./k3d image import linkerd-ci/linkerd/proxy:${GITHUB_SHA}
+          ./k3d image import ${PROXY_IMAGE}
 
-      - name: Setup linkerd
+      - name: Instal Linkerd in cluster
         run:
           ./linkerd check --pre
           ./linkerd install \
