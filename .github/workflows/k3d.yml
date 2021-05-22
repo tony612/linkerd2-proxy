@@ -53,7 +53,8 @@ jobs:
                 --set proxyImage=ghcr.io/linkerd/proxy \
                 --set proxyInitImage=ghcr.io/linkerd/proxy-init \
               | ./target/bin/kubectl apply -f -
-          ./target/bin/linkerd check
+          sleep 60
+          ./target/bin/linkerd check --wait=5m
 
 
       - name: Run tests
