@@ -23,30 +23,19 @@ jobs:
       PROXY_IMAGE: linkerd-ci/linkerd/proxy:${GITHUB_SHA}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f # v2.3.4
-
-      # Build a docker image for the working proxy, based on a recent Linkerd version for its
-      # runtime image.
-      - name: Docker
-        env:
-          RUNTIME_IMAGE: ghcr.io/linkerd/proxy:${LINKERD_VERSION}
-          DOCKER_TAG: ${PROXY_IMAGE}
-        run: make docker
-
       - name: Install kubectl
         run:
-          curl -sLo ./kubectl "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          curl -vsLo ./kubectl "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
           chmod 755 ./kubectl
 
       - name: Install k3d
         run:
-          curl -sLo ./k3d "https://github.com/rancher/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
+          curl -vsLo ./k3d "https://github.com/rancher/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
           chmod 755 ./k3d
 
       - name: Install linkerd CLI
         run:
-          curl -sLo ./linkerd "https://github.com/linkerd/linkerd2/releases/download/${LINKERD_VERSION}/linkerd2-cli-${LINKERD_VERSION}-linux-amd64"
+          curl -vsLo ./linkerd "https://github.com/linkerd/linkerd2/releases/download/${LINKERD_VERSION}/linkerd2-cli-${LINKERD_VERSION}-linux-amd64"
           chmod 755 ./linkerd
 
       - name: Setup cluster
@@ -58,11 +47,23 @@ jobs:
         run:
           ./linkerd check --pre
           ./linkerd install \
-            --set controllerImage=ghcr.io/linkerd/controller \
-            --set proxyImage=ghcr.io/linkerd/proxy \
-            --set proxyInitImage=ghcr.io/linkerd/proxy-init \
+                --set controllerImage=ghcr.io/linkerd/controller \
+                --set proxyImage=ghcr.io/linkerd/proxy \
+                --set proxyInitImage=ghcr.io/linkerd/proxy-init \
               | ./kubectl apply -f -
           ./linkerd check
+
+      - name: Checkout
+        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f # v2.3.4
+
+      # Build a docker image for the working proxy, based on a recent Linkerd version for its
+      # runtime image.
+      - name: Docker
+        env:
+          RUNTIME_IMAGE: ghcr.io/linkerd/proxy:${LINKERD_VERSION}
+          DOCKER_TAG: ${PROXY_IMAGE}
+        run: make docker
+
 
       - name: Run tests
         run:
