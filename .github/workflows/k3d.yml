@@ -61,7 +61,7 @@ jobs:
       - name: Build proxy
         run: |
           RUNTIME_IMAGE=ghcr.io/linkerd/proxy:${LINKERD_VERSION} DOCKER_TAG=${PROXY_IMAGE}:${GITHUB_SHA} make docker
-          k3d image import ${PROXY_IMAGE}:${GITHUB_SHA}
+          ./target/bin/k3d image import ${PROXY_IMAGE}:${GITHUB_SHA}
 
       - name: Run tests
         run: |
