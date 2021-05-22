@@ -20,7 +20,7 @@ jobs:
       LINKERD_VERSION: edge-21.5.2
       K3D_VERSION: v4.4.4
       KUBECTL_VERSION: v1.21.1
-      PROXY_IMAGE: linkerd-ci/linkerd/proxy:${{ env.GITHUB_SHA }}
+      PROXY_IMAGE: linkerd-ci/linkerd/proxy:${GITHUB_SHA}
 
     steps:
       - name: Checkout
@@ -30,8 +30,8 @@ jobs:
       # runtime image.
       - name: Docker
         env:
-          RUNTIME_IMAGE: ghcr.io/linkerd/proxy:${{ env.LINKERD_VERSION }}
-          DOCKER_TAG: ${{ env.PROXY_IMAGE }}
+          RUNTIME_IMAGE: ghcr.io/linkerd/proxy:${LINKERD_VERSION}
+          DOCKER_TAG: ${PROXY_IMAGE}
         run: make docker
 
       - name: Install kubectl
