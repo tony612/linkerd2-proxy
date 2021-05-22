@@ -56,7 +56,7 @@ jobs:
               | ./target/bin/kubectl apply -f -
 
           for i in $(seq 1 9); do
-            ./target/bin/linkerd check --wait=1m || ./target/bin/kubectl get po - linkerd
+            ./target/bin/linkerd check --wait=1m || ./target/bin/kubectl get po -n linkerd
           done
           ./target/bin/linkerd check --wait=1m
 
