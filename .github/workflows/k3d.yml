@@ -39,16 +39,19 @@ jobs:
       - name: Create cluster
         run: ./target/bin/k3d cluster create
 
-      - name: Install Linkerd in cluster
+      - name: Load Linkerd images
         run: |
-          docker pull ghcr.io/linkerd/controller:${LINKERD_VERSION}
-          docker pull ghcr.io/linkerd/proxy:${LINKERD_VERSION}
-          docker pull ghcr.io/linkerd/proxy-init:${LINKERD_VERSION}
+          docker pull ghcr.io/linkerd/controller:${LINKERD_VERSION} &
+          docker pull ghcr.io/linkerd/proxy:${LINKERD_VERSION} &
+          docker pull ghcr.io/linkerd/proxy-init:${LINKERD_VERSION} &
+          wait %1 %2 %3
           ./target/bin/k3d image import \
               ghcr.io/linkerd/controller:${LINKERD_VERSION} \
               ghcr.io/linkerd/proxy:${LINKERD_VERSION} \
               ghcr.io/linkerd/proxy-init:${LINKERD_VERSION}
 
+      - name: Install Linkerd in cluster
+        run: |
           ./target/bin/linkerd check --pre
 
           ./target/bin/linkerd install \
@@ -63,6 +66,7 @@ jobs:
             fi
             ./target/bin/kubectl get po -n linkerd
           done
+          ./target/bin/kubectl get po -o yaml -n linkerd | grep -F 'image:'
 
       # Build a docker image for the working proxy, based on a recent Linkerd version for its
       # runtime image.
