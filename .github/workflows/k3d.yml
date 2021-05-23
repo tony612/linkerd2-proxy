@@ -39,8 +39,16 @@ jobs:
       - name: Create cluster
         run: ./target/bin/k3d cluster create
 
-      - name: Instal Linkerd in cluster
+      - name: Install Linkerd in cluster
         run: |
+          docker pull ghcr.io/linkerd/controller:${LINKERD_VERSION}
+          docker pull ghcr.io/linkerd/proxy:${LINKERD_VERSION}
+          docker pull ghcr.io/linkerd/proxy-init:${LINKERD_VERSION}
+          ./target/bin/k3d image import \
+              ghcr.io/linkerd/controller:${LINKERD_VERSION} \
+              ghcr.io/linkerd/proxy:${LINKERD_VERSION} \
+              ghcr.io/linkerd/proxy-init:${LINKERD_VERSION}
+
           ./target/bin/linkerd check --pre
 
           ./target/bin/linkerd install \
