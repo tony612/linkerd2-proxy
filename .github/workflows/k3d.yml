@@ -22,8 +22,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - run: curl --help all
-
       - name: Checkout
         uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f # v2.3.4
 
@@ -32,16 +30,16 @@ jobs:
       - name: Fetch kubectl ${{ env.KUBECTL_VERSION }}
         run: |
           # Fetch kubectl
-          curl -vsL \
-            -o ./target/bin/kubectl \
+          curl -vsL --retry 2 \
+            --output ./target/bin/kubectl \
             "https://storage.googleapis.com/kubernetes-release/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
           chmod 755 ./target/bin/kubectl
 
       - name: Fetch k3d ${{ env.K3D_VERSION }}
         run: |
           # Fetch k3d
-          curl -vsL \
-            -o ./target/bin/k3d \
+          curl -vsL --retry 2 \
+            --output ./target/bin/k3d \
             "https://github.com/rancher/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
           chmod 755 ./target/bin/k3d
 
@@ -57,8 +55,8 @@ jobs:
       - name: Fetch linkerd ${{ env.LINKERD_VERSION }}
         run: |
           # Install Linkerd CLI
-          curl -vsL \
-            -o ./target/bin/linkerd \
+          curl -vsL --retry 2 \
+            --output ./target/bin/linkerd \
             "https://github.com/linkerd/linkerd2/releases/download/${LINKERD_VERSION}/linkerd2-cli-${LINKERD_VERSION}-linux-amd64"
           chmod 755 ./target/bin/linkerd
 
