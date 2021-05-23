@@ -17,6 +17,7 @@ jobs:
     env:
       DOCKER_UNOPTIMIZED: "1"
       LINKERD_VERSION: edge-21.5.2
+      LINKERD_INIT_VERSION: v1.3.12
       K3D_VERSION: v4.4.4
       KUBECTL_VERSION: v1.21.1
       PROXY_IMAGE: linkerd-ci/linkerd/proxy
@@ -43,12 +44,12 @@ jobs:
         run: |
           docker pull ghcr.io/linkerd/controller:${LINKERD_VERSION} &
           docker pull ghcr.io/linkerd/proxy:${LINKERD_VERSION} &
-          docker pull ghcr.io/linkerd/proxy-init:${LINKERD_VERSION} &
+          docker pull ghcr.io/linkerd/proxy-init:${LINKERD_INIT_VERSION}
           wait %1 %2 %3
           ./target/bin/k3d image import \
               ghcr.io/linkerd/controller:${LINKERD_VERSION} \
               ghcr.io/linkerd/proxy:${LINKERD_VERSION} \
-              ghcr.io/linkerd/proxy-init:${LINKERD_VERSION}
+              ghcr.io/linkerd/proxy-init:${LINKERD_INIT_VERSION}
 
       - name: Install Linkerd in cluster
         run: |
