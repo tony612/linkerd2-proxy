@@ -42,9 +42,9 @@ jobs:
 
       - name: Load Linkerd images
         run: |
-          docker pull ghcr.io/linkerd/controller:${LINKERD_VERSION} &
-          docker pull ghcr.io/linkerd/proxy:${LINKERD_VERSION} &
-          docker pull ghcr.io/linkerd/proxy-init:${LINKERD_INIT_VERSION}
+          docker pull -q ghcr.io/linkerd/controller:${LINKERD_VERSION} &
+          docker pull -q ghcr.io/linkerd/proxy:${LINKERD_VERSION} &
+          docker pull -q ghcr.io/linkerd/proxy-init:${LINKERD_INIT_VERSION} &
           wait %1 %2 %3
           ./target/bin/k3d image import \
               ghcr.io/linkerd/controller:${LINKERD_VERSION} \
