@@ -259,6 +259,15 @@ impl<B: Body + Unpin> Body for ReplayBody<B> {
 
 impl<B> Clone for ReplayBody<B> {
     fn clone(&self) -> Self {
+        tracing::debug!(
+            buf.bytes = self
+                .state
+                .as_ref()
+                .map(|state| state.buf.remaining() as i64)
+                .unwrap_or(-1), // "-1" means unknown here
+            shared.ref_count = Arc::strong_count(&self.shared),
+            "clone replay body"
+        );
         Self {
             state: None,
             shared: self.shared.clone(),
@@ -272,7 +281,16 @@ impl<B> Clone for ReplayBody<B> {
 
 impl<B> Drop for ReplayBody<B> {
     fn drop(&mut self) {
-        // If this clone owned the shared state, put it back.`s
+        // If this clone owned the shared state, put it back.`
+        tracing::debug!(
+            buf.bytes = self
+                .state
+                .as_ref()
+                .map(|state| state.buf.remaining() as i64)
+                .unwrap_or(-1), // "-1" means unknown here
+            shared.ref_count = Arc::strong_count(&self.shared),
+            "drop replay body"
+        );
         if let Some(state) = self.state.take() {
             *self.shared.body.lock() = Some(state);
         }
@@ -410,6 +428,16 @@ impl Buf for BufList {
                 buf.freeze()
             }
         }
+    }
+}
+
+impl<B> Drop for BodyState<B> {
+    fn drop(&mut self) {
+        tracing::debug!(
+            buf.bytes = self.buf.remaining(),
+            has_rest = self.rest.is_some(),
+            "drop shared state"
+        );
     }
 }
 
