@@ -3,7 +3,17 @@ use http::HeaderMap;
 use http_body::Body;
 use linkerd_stack as svc;
 use parking_lot::Mutex;
-use std::{collections::VecDeque, io::IoSlice, pin::Pin, sync::Arc, task::Context, task::Poll};
+use std::{
+    collections::VecDeque,
+    io::IoSlice,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    task::Context,
+    task::Poll,
+};
 
 /// Wraps an HTTP body type and lazily buffers data as it is read from the inner
 /// body.
@@ -34,6 +44,7 @@ pub struct ReplayBody<B> {
 
     /// Should this clone replay trailers from the shared state?
     replay_trailers: bool,
+    id: usize,
 }
 
 /// Data returned by `ReplayBody`'s `http_body::Body` implementation is either
@@ -81,6 +92,9 @@ pub fn layer<B: Body>() -> svc::MapTargetLayer<fn(http::Request<B>) -> http::Req
 impl<B: Body> ReplayBody<B> {
     /// Wraps an initial `Body` in a `ReplayBody`.
     pub fn new(body: B) -> Self {
+        static ID: AtomicUsize = AtomicUsize::new(0);
+        let id = ID.fetch_add(1, Ordering::Relaxed);
+        tracing::debug!(body = %std::any::type_name::<B>(), id, "ReplayBody::new", );
         let was_empty = body.is_end_stream();
         Self {
             state: Some(BodyState {
@@ -96,6 +110,7 @@ impl<B: Body> ReplayBody<B> {
             // The initial `ReplayBody` has nothing to replay
             replay_body: false,
             replay_trailers: false,
+            id,
         }
     }
 
@@ -129,6 +144,7 @@ impl<B: Body + Unpin> Body for ReplayBody<B> {
             replay_body = this.replay_body,
             buf.has_remaining = state.buf.has_remaining(),
             body.is_completed = state.is_completed,
+            id = this.id,
             "Replay::poll_data"
         );
 
@@ -266,6 +282,7 @@ impl<B> Clone for ReplayBody<B> {
                 .map(|state| state.buf.remaining() as i64)
                 .unwrap_or(-1), // "-1" means unknown here
             shared.ref_count = Arc::strong_count(&self.shared),
+            id = self.id,
             "clone replay body"
         );
         Self {
@@ -275,6 +292,7 @@ impl<B> Clone for ReplayBody<B> {
             // reading any additional data from the initial body.
             replay_body: true,
             replay_trailers: true,
+            id: self.id,
         }
     }
 }
@@ -289,6 +307,7 @@ impl<B> Drop for ReplayBody<B> {
                 .map(|state| state.buf.remaining() as i64)
                 .unwrap_or(-1), // "-1" means unknown here
             shared.ref_count = Arc::strong_count(&self.shared),
+            id = self.id,
             "drop replay body"
         );
         if let Some(state) = self.state.take() {
@@ -350,8 +369,10 @@ impl BufList {
         // internally be a cheap refcount bump almost all of the time.
         // But, if it isn't, this will copy it to a `Bytes` that we can
         // now clone.
+        tracing::trace!("BufList::push_chunk: copy_to_bytes");
         let bytes = data.copy_to_bytes(len);
         // Buffer a clone of the bytes read on this poll.
+        tracing::trace!("BufList::push_chunk: Bytes::clone()");
         self.bufs.push_back(bytes.clone());
         // Return the bytes
         bytes
@@ -412,10 +433,12 @@ impl Buf for BufList {
         // just a reference count bump).
         match self.bufs.front_mut() {
             Some(first) if len <= first.remaining() => {
+                tracing::trace!("BufList::copy_to_bytes: clone");
                 let buf = first.copy_to_bytes(len);
                 // if we consumed the first buffer, also advance our "cursor" by
                 // popping it.
                 if first.remaining() == 0 {
+                    tracing::trace!("BufList::copy_to_bytes: consumed all");
                     self.bufs.pop_front();
                 }
 
