@@ -7,7 +7,7 @@ on:
       - "ver/k3d-tests"
 
 env:
-  LINKERD_VERSION: edge-21.5.2
+  LINKERD_VERSION: edge-21.6.3
   LINKERD_INIT_VERSION: v1.3.12
   K3D_VERSION: v4.4.4
   KUBECTL_VERSION: v1.21.1
@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f # v2.3.4
+        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
 
       - run: mkdir -p ./target/bin
 
