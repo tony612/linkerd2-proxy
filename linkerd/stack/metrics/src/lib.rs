@@ -1,4 +1,5 @@
 #![deny(warnings, rust_2018_idioms)]
+#![forbid(unsafe_code)]
 #![allow(clippy::inconsistent_struct_constructor)]
 
 mod layer;
@@ -6,11 +7,13 @@ mod service;
 
 pub use self::layer::TrackServiceLayer;
 pub use self::service::TrackService;
-use indexmap::IndexMap;
 use linkerd_metrics::{metrics, Counter, FmtLabels, FmtMetrics};
-use std::fmt;
-use std::hash::Hash;
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    fmt,
+    hash::Hash,
+    sync::{Arc, Mutex},
+};
 
 metrics! {
     stack_create_total: Counter { "Total number of services created" },
@@ -19,7 +22,7 @@ metrics! {
     stack_poll_total_ms: Counter { "Total number of milliseconds this service has spent awaiting readiness" }
 }
 
-type Shared<L> = Arc<Mutex<IndexMap<L, Arc<Metrics>>>>;
+type Shared<L> = Arc<Mutex<HashMap<L, Arc<Metrics>>>>;
 
 #[derive(Debug)]
 pub struct Registry<L: Hash + Eq>(Shared<L>);

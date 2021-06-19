@@ -1,6 +1,7 @@
 //! Utilities for composing Tower Services.
 
 #![deny(warnings, rust_2018_idioms)]
+#![forbid(unsafe_code)]
 #![allow(clippy::inconsistent_struct_constructor)]
 
 mod box_future;
@@ -40,7 +41,7 @@ pub use self::{
     unwrap_or::UnwrapOr,
 };
 pub use tower::{
-    util::{future_service, FutureService, ServiceExt},
+    util::{future_service, FutureService, MapErr, MapErrLayer, Oneshot, ServiceExt},
     Service,
 };
 

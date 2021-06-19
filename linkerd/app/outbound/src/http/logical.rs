@@ -15,7 +15,7 @@ use tracing::debug_span;
 impl<E> Outbound<E> {
     pub fn push_http_logical<B, ESvc, R>(self, resolve: R) -> Outbound<svc::BoxNewHttp<Logical, B>>
     where
-        B: http::HttpBody<Error = Error> + std::fmt::Debug + Default + Send + 'static,
+        B: http::HttpBody<Error = Error> + std::fmt::Debug + Default + Unpin + Send + 'static,
         B::Data: Send + 'static,
         E: svc::NewService<Endpoint, Service = ESvc> + Clone + Send + Sync + 'static,
         ESvc: svc::Service<http::Request<http::BoxBody>, Response = http::Response<http::BoxBody>>
@@ -120,6 +120,12 @@ impl<E> Outbound<E> {
                             .http_route_actual
                             .to_layer::<classify::Response, _>(),
                     )
+                    // Depending on whether or not the request can be retried,
+                    // it may have one of two `Body` types. This layer unifies
+                    // any `Body` type into `BoxBody` so that the rest of the
+                    // stack doesn't have to implement `Service` for requests
+                    // with both body types.
+                    .push_on_response(http::BoxRequest::erased())
                     // Sets an optional retry policy.
                     .push(retry::layer(rt.metrics.http_route_retry.clone()))
                     // Sets an optional request timeout.
@@ -134,7 +140,7 @@ impl<E> Outbound<E> {
             ))
             // Strips headers that may be set by this proxy and add an outbound
             // canonical-dst-header. The response body is boxed unify the profile
-            // stack's response type. withthat of to endpoint stack.
+            // stack's response type with that of to endpoint stack.
             .push(http::NewHeaderFromTarget::<CanonicalDstHeader, _>::layer())
             .push_on_response(svc::layers().push(http::BoxResponse::layer()))
             .instrument(|l: &Logical| debug_span!("logical", dst = %l.logical_addr))

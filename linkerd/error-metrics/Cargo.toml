@@ -8,8 +8,7 @@ publish = false
 
 
 [dependencies]
-futures = "0.3.9"
-indexmap = "1.0"
+futures = { version = "0.3", default-features = false }
 linkerd-metrics = { path = "../metrics" }
-tower = { version = "0.4.7", default-features = false }
+tower = { version = "0.4.8", default-features = false }
 pin-project = "1"

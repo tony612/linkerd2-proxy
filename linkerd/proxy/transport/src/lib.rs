@@ -1,4 +1,9 @@
+//! Utilities for use TCP servers & clients.
+//!
+//! Uses unsafe code to interact with socket options for keepalive and SO_ORIGINAL_DST.
+
 #![deny(warnings, rust_2018_idioms)]
+//#![forbid(unsafe_code)]
 #![allow(clippy::inconsistent_struct_constructor)]
 
 pub mod addrs;
@@ -13,6 +18,7 @@ pub use self::{
     listen::{Bind, BindTcp},
     orig_dst::BindWithOrigDst,
 };
+use socket2::TcpKeepalive;
 use std::time::Duration;
 use tokio::net::TcpStream;
 
@@ -33,7 +39,7 @@ fn set_nodelay_or_warn(socket: &TcpStream) {
     }
 }
 
-fn set_keepalive_or_warn(tcp: &TcpStream, ka: Option<Duration>) {
+fn set_keepalive_or_warn(tcp: &TcpStream, keepalive_duration: Option<Duration>) {
     // TODO(eliza): when https://github.com/tokio-rs/tokio/pull/3189 merges
     // upstream, we will be able to convert the Tokio `TcpStream` into a
     // `socket2::Socket` without unsafe, by converting it to a
@@ -67,7 +73,10 @@ fn set_keepalive_or_warn(tcp: &TcpStream, ka: Option<Duration>) {
         socket2::Socket::from_raw_socket(tcp.as_raw_socket())
     };
 
-    if let Err(e) = sock.set_keepalive(ka) {
+    let ka = keepalive_duration
+        .into_iter()
+        .fold(TcpKeepalive::new(), |k, t| k.with_time(t));
+    if let Err(e) = sock.set_tcp_keepalive(&ka) {
         tracing::warn!("failed to set keepalive: {}", e);
     }
 

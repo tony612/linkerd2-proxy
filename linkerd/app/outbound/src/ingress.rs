@@ -97,8 +97,7 @@ impl Outbound<svc::BoxNewHttp<http::Endpoint>> {
             .push_request_filter(
                 |(profile, http): (Option<profiles::Receiver>, Http<NameAddr>)| {
                     if let Some(profile) = profile {
-                        let addr = profile.borrow().addr.clone();
-                        if let Some(logical_addr) = addr {
+                        if let Some(logical_addr) = profile.logical_addr() {
                             return Ok(http::Logical {
                                 profile,
                                 logical_addr,
@@ -168,6 +167,11 @@ impl Outbound<svc::BoxNewHttp<http::Endpoint>> {
                     })),
                 },
                 http_endpoint
+                    .push_on_response(
+                        svc::layers()
+                            .push(svc::layer::mk(svc::SpawnReady::new))
+                            .push(svc::FailFast::layer("Ingress server", dispatch_timeout)),
+                    )
                     .instrument(|_: &_| info_span!("forward"))
                     .into_inner(),
             )
@@ -202,7 +206,7 @@ impl Outbound<svc::BoxNewHttp<http::Endpoint>> {
                     // The concurrency-limit can force the service into fail-fast, but it need not
                     // be driven to readiness on a background task (i.e., by `SpawnReady`).
                     // Otherwise, the inner service is always ready (because it's a router).
-                    .push(svc::ConcurrencyLimit::layer(max_in_flight_requests))
+                    .push(svc::ConcurrencyLimitLayer::new(max_in_flight_requests))
                     .push(svc::FailFast::layer("Ingress server", dispatch_timeout))
                     .push(rt.metrics.http_errors.clone())
                     .push(errors::layer())

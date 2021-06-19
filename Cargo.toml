@@ -6,6 +6,7 @@ resolver = "2"
 members = [
     "hyper-balance",
     "linkerd/addr",
+    "linkerd/app/admin",
     "linkerd/app/core",
     "linkerd/app/gateway",
     "linkerd/app/inbound",
@@ -14,13 +15,11 @@ members = [
     "linkerd/app/test",
     "linkerd/app",
     "linkerd/cache",
-    "linkerd/concurrency-limit",
     "linkerd/conditional",
     "linkerd/detect",
     "linkerd/transport-header",
     "linkerd/dns/name",
     "linkerd/dns",
-    "linkerd/drain",
     "linkerd/duplex",
     "linkerd/error",
     "linkerd/errno",
@@ -30,6 +29,7 @@ members = [
     "linkerd/http-box",
     "linkerd/http-classify",
     "linkerd/http-metrics",
+    "linkerd/http-retry",
     "linkerd/identity",
     "linkerd/io",
     "linkerd/metrics",
@@ -51,7 +51,9 @@ members = [
     "linkerd/stack",
     "linkerd/stack/metrics",
     "linkerd/stack/tracing",
+    "linkerd/system",
     "linkerd/timeout",
+    "linkerd/tonic-watch",
     "linkerd/tls",
     "linkerd/tracing",
     "linkerd2-proxy",
@@ -66,6 +68,4 @@ debug = false
 debug = false
 
 [patch.crates-io]
-trust-dns-proto = { git = "https://github.com/bluejekyll/trust-dns", branch = "main" }
-trust-dns-resolver = { git = "https://github.com/bluejekyll/trust-dns", branch = "main" }
 webpki = { git = "https://github.com/linkerd/webpki", branch = "cert-dns-names-0.21" }

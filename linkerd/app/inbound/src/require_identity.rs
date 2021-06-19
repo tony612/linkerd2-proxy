@@ -1,6 +1,5 @@
 use crate::target::TcpAccept;
-use indexmap::IndexSet;
-use linkerd_app_core::{svc::stack::Predicate, tls, Conditional, Error};
+use linkerd_app_core::{config::PortSet, svc::stack::Predicate, tls, Conditional, Error};
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -8,7 +7,7 @@ use thiserror::Error;
 /// if they target one of the configured local ports.
 #[derive(Clone, Debug)]
 pub struct RequireIdentityForPorts {
-    ports: Arc<IndexSet<u16>>,
+    ports: Arc<PortSet>,
 }
 
 #[derive(Debug, Error)]

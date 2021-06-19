@@ -1,4 +1,5 @@
 #![deny(warnings, rust_2018_idioms)]
+#![forbid(unsafe_code)]
 #![allow(clippy::inconsistent_struct_constructor)]
 
 pub use linkerd_identity::LocalId;
@@ -38,7 +39,7 @@ impl std::fmt::Debug for NegotiatedProtocol {
 }
 
 impl NegotiatedProtocolRef<'_> {
-    pub fn to_owned(&self) -> NegotiatedProtocol {
+    pub fn to_owned(self) -> NegotiatedProtocol {
         NegotiatedProtocol(self.0.into())
     }
 }

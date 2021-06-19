@@ -1,10 +1,7 @@
-use crate::Receiver;
-use indexmap::IndexMap;
 use regex::Regex;
 use std::{
     fmt,
     hash::{Hash, Hasher},
-    iter::FromIterator,
     ops::Deref,
     sync::Arc,
     time::Duration,
@@ -56,7 +53,7 @@ pub struct Retries {
 }
 
 #[derive(Clone, Default)]
-struct Labels(Arc<IndexMap<String, String>>);
+struct Labels(Arc<std::collections::BTreeMap<String, String>>);
 
 // === impl Route ===
 
@@ -65,11 +62,7 @@ impl Route {
     where
         I: Iterator<Item = (String, String)>,
     {
-        let labels = {
-            let mut pairs = label_iter.collect::<Vec<_>>();
-            pairs.sort_by(|(k0, _), (k1, _)| k0.cmp(k1));
-            Labels(Arc::new(IndexMap::from_iter(pairs)))
-        };
+        let labels = Labels(Arc::new(label_iter.collect()));
 
         Self {
             labels,
@@ -79,7 +72,7 @@ impl Route {
         }
     }
 
-    pub fn labels(&self) -> &Arc<IndexMap<String, String>> {
+    pub fn labels(&self) -> &Arc<std::collections::BTreeMap<String, String>> {
         &self.labels.0
     }
 
