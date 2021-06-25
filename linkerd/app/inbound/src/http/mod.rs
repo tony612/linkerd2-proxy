@@ -1,7 +1,10 @@
+mod set_bad_gateway_header;
 mod set_identity_header;
+
 #[cfg(test)]
 mod tests;
 
+use self::set_bad_gateway_header::SetBadGatewayHeader;
 use self::set_identity_header::NewSetIdentityHeader;
 use crate::{
     allow_discovery::AllowProfile,
@@ -80,6 +83,8 @@ impl<H> Inbound<H> {
                     .push(rt.metrics.http_errors.clone())
                     // Synthesizes responses for proxy errors.
                     .push(errors::layer())
+                    // .push(strip_header::response::layer("l5d-bad-gateway"))
+                    .push(SetBadGatewayHeader::layer())
                     .push(http_tracing::server(rt.span_sink.clone(), trace_labels()))
                     // Record when an HTTP/1 URI was in absolute form
                     .push(http::normalize_uri::MarkAbsoluteForm::layer())
