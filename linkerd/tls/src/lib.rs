@@ -4,7 +4,7 @@
 
 pub use linkerd_identity::LocalId;
 use linkerd_io as io;
-pub use tokio_rustls::rustls::Session;
+pub use tokio_rustls::rustls::Connection;
 
 pub mod client;
 pub mod server;
@@ -62,20 +62,14 @@ impl std::fmt::Debug for NegotiatedProtocolRef<'_> {
 impl<I> HasNegotiatedProtocol for self::client::TlsStream<I> {
     #[inline]
     fn negotiated_protocol(&self) -> Option<NegotiatedProtocolRef<'_>> {
-        self.get_ref()
-            .1
-            .get_alpn_protocol()
-            .map(NegotiatedProtocolRef)
+        self.get_ref().1.alpn_protocol().map(NegotiatedProtocolRef)
     }
 }
 
 impl<I> HasNegotiatedProtocol for self::server::TlsStream<I> {
     #[inline]
     fn negotiated_protocol(&self) -> Option<NegotiatedProtocolRef<'_>> {
-        self.get_ref()
-            .1
-            .get_alpn_protocol()
-            .map(NegotiatedProtocolRef)
+        self.get_ref().1.alpn_protocol().map(NegotiatedProtocolRef)
     }
 }
 

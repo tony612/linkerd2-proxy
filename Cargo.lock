@@ -991,11 +991,13 @@ version = "0.1.0"
 dependencies = [
  "linkerd-dns-name",
  "ring",
+ "rustls",
+ "rustls-pemfile",
  "thiserror",
  "tokio-rustls",
  "tracing",
  "untrusted",
- "webpki 0.21.4",
+ "webpki 0.22.0",
 ]
 
 [[package]]
@@ -1937,6 +1939,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-pemfile"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5eebeaeb360c87bfb72e84abdb3447159c0eaececf1bef2aecd65a8be949d1c9"
+dependencies = [
+ "base64",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2568,7 +2579,7 @@ dependencies = [
 [[package]]
 name = "webpki"
 version = "0.21.4"
-source = "git+https://github.com/linkerd/webpki?branch=cert-dns-names-0.21#a4acca51d3dab4c99680e570dd4498b0c8b13b94"
+source = "git+https://github.com/hawkw/webpki?branch=cert-dns-names-0.22#2abb0c83e336f2d1dd2339bd988ea808fb2fb313"
 dependencies = [
  "ring",
  "untrusted",

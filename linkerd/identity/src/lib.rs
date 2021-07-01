@@ -5,6 +5,7 @@
 pub use ring::error::KeyRejected;
 use ring::rand;
 use ring::signature::EcdsaKeyPair;
+use rustls::AllowAnyAnonymousOrAuthenticatedClient;
 use std::{convert::TryFrom, fmt, fs, io, str::FromStr, sync::Arc, time::SystemTime};
 use thiserror::Error;
 use tokio_rustls::rustls;
@@ -30,7 +31,7 @@ struct SigningKey(Arc<EcdsaKeyPair>);
 struct Signer(Arc<EcdsaKeyPair>);
 
 #[derive(Clone)]
-pub struct TrustAnchors(Arc<rustls::ClientConfig>);
+pub struct TrustAnchors(rustls::RootCertStore);
 
 #[derive(Clone, Debug)]
 pub struct TokenSource(Arc<String>);
@@ -50,11 +51,12 @@ pub struct CrtKey {
     server_config: Arc<rustls::ServerConfig>,
 }
 
-struct CertResolver(rustls::sign::CertifiedKey);
+#[derive(Clone)]
+struct CertResolver(Arc<rustls::sign::CertifiedKey>);
 
 #[derive(Clone, Debug, Error)]
 #[error(transparent)]
-pub struct InvalidCrt(rustls::TLSError);
+pub struct InvalidCrt(rustls::Error);
 
 /// A newtype for local server identities.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -67,10 +69,8 @@ const SIGNATURE_ALG_RUSTLS_SCHEME: rustls::SignatureScheme =
     rustls::SignatureScheme::ECDSA_NISTP256_SHA256;
 const SIGNATURE_ALG_RUSTLS_ALGORITHM: rustls::internal::msgs::enums::SignatureAlgorithm =
     rustls::internal::msgs::enums::SignatureAlgorithm::ECDSA;
-const TLS_VERSIONS: &[rustls::ProtocolVersion] = &[
-    rustls::ProtocolVersion::TLSv1_2,
-    rustls::ProtocolVersion::TLSv1_3,
-];
+static TLS_VERSIONS: &[&rustls::SupportedProtocolVersion] =
+    &[&rustls::version::TLS12, &rustls::version::TLS12];
 
 // === impl Csr ===
 
@@ -115,14 +115,12 @@ impl rustls::sign::SigningKey for SigningKey {
 }
 
 impl rustls::sign::Signer for Signer {
-    fn sign(&self, message: &[u8]) -> Result<Vec<u8>, rustls::TLSError> {
+    fn sign(&self, message: &[u8]) -> Result<Vec<u8>, rustls::Error> {
         let rng = rand::SystemRandom::new();
         self.0
             .sign(&rng, message)
             .map(|signature| signature.as_ref().to_owned())
-            .map_err(|ring::error::Unspecified| {
-                rustls::TLSError::General("Signing Failed".to_owned())
-            })
+            .map_err(|ring::error::Unspecified| rustls::Error::General("Signing Failed".to_owned()))
     }
 
     fn get_scheme(&self) -> rustls::SignatureScheme {
@@ -138,8 +136,8 @@ impl From<linkerd_dns_name::Name> for Name {
     }
 }
 
-impl<'t> From<&'t LocalId> for webpki::DNSNameRef<'t> {
-    fn from(LocalId(ref name): &'t LocalId) -> webpki::DNSNameRef<'t> {
+impl<'t> From<&'t LocalId> for webpki::DnsNameRef<'t> {
+    fn from(LocalId(ref name): &'t LocalId) -> webpki::DnsNameRef<'t> {
         name.into()
     }
 }
@@ -168,9 +166,30 @@ impl TryFrom<&[u8]> for Name {
     }
 }
 
-impl<'t> From<&'t Name> for webpki::DNSNameRef<'t> {
-    fn from(Name(ref name): &'t Name) -> webpki::DNSNameRef<'t> {
-        name.as_ref().into()
+impl<'t> From<&'t Name> for webpki::DnsNameRef<'t> {
+    fn from(Name(ref _name): &'t Name) -> webpki::DnsNameRef<'t> {
+        // name.as_ref().into()
+        todo!("(eliza) i guess this doenst work anymore?")
+    }
+}
+
+impl From<&'_ Name> for rustls::ServerName {
+    fn from(name: &Name) -> rustls::ServerName {
+        // TODO(eliza): this is a `webpki::DnsName` internally, and
+        // `rustls::ServerName`'s `DnsName` variant is _also_, internally, a
+        // `webpki::DnsName`...so, we shouldn't have to parse this again and
+        // unwrap it. But, `rustls` doesn't currently provide any way to convert
+        // a `DnsName` or `DnsNameRef` into its `ServerName` type, except
+        // round-tripping through a string and parsing it. Which is sad.
+        //
+        // It would be nice to have better conversions upstream, so that we
+        // don't have to do this.
+        rustls::ServerName::try_from(name.as_ref()).expect(
+            "a `Name` is internally a `webpki::DnsName`, and \
+                `rustls::ServerName` is also internally a `webpki::DnsName`...\
+                so if we have a `Name`, we have already parsed the name and \
+                it must be valid",
+        )
     }
 }
 
@@ -216,39 +235,68 @@ impl TokenSource {
 impl TrustAnchors {
     #[cfg(any(test, feature = "test-util"))]
     fn empty() -> Self {
-        TrustAnchors(Arc::new(rustls::ClientConfig::new()))
+        TrustAnchors(rustls::RootCertStore::empty())
+        // todo!("eliza")
     }
 
     pub fn from_pem(s: &str) -> Option<Self> {
         use std::io::Cursor;
 
         let mut roots = rustls::RootCertStore::empty();
-        let (added, skipped) = roots.add_pem_file(&mut Cursor::new(s)).ok()?;
-        if skipped != 0 {
-            warn!("skipped {} trust anchors in trust anchors file", skipped);
-        }
-        if added == 0 {
-            return None;
-        }
+        let certs = match rustls_pemfile::certs(&mut Cursor::new(s)) {
+            Err(error) => {
+                warn!(%error, "invalid trust anchors file");
+                return None;
+            }
+            Ok(certs) if certs.is_empty() => {
+                warn!("no valid certs in trust anchors file");
+                return None;
+            }
+            Ok(certs) => certs,
+        };
+        let certs: Vec<webpki::TrustAnchor<'_>> = match certs
+            .iter()
+            .map(|cert| webpki::TrustAnchor::try_from_cert_der(&cert[..]))
+            .collect()
+        {
+            Err(error) => {
+                warn!(%error, "invalid trust anchor");
+                return None;
+            }
+            Ok(certs) => certs,
+        };
 
-        let mut c = rustls::ClientConfig::new();
+        roots.add_server_trust_anchors(certs.iter());
 
-        // XXX: Rustls's built-in verifiers don't let us tweak things as fully
-        // as we'd like (e.g. controlling the set of trusted signature
-        // algorithms), but they provide good enough defaults for now.
-        // TODO: lock down the verification further.
-        // TODO: Change Rustls's API to Avoid needing to clone `root_cert_store`.
-        c.root_store = roots;
+        // // XXX: Rustls's built-in verifiers don't let us tweak things as fully
+        // // as we'd like (e.g. controlling the set of trusted signature
+        // // algorithms), but they provide good enough defaults for now.
+        // // TODO: lock down the verification further.
+        // // TODO: Change Rustls's API to Avoid needing to clone `root_cert_store`.
+        // c.root_store = roots;
 
-        // Disable session resumption for the time-being until resumption is
-        // more tested.
-        c.enable_tickets = false;
+        // // Disable session resumption for the time-being until resumption is
+        // // more tested.
+        // c.enable_tickets = false;
 
-        Some(TrustAnchors(Arc::new(c)))
+        // Some(TrustAnchors(Arc::new(c)))
+        Some(TrustAnchors(roots))
     }
 
     pub fn certify(&self, key: Key, crt: Crt) -> Result<CrtKey, InvalidCrt> {
-        let mut client = self.0.as_ref().clone();
+        // Rustls considers this a "dangerous configuration", but we're doing
+        // *exactly* what its builder API does internally. the difference is
+        // just that we want to share the verifier, so we have to `Arc` it and
+        // pass it in ourselves. this is "dangerous" because we could pass in
+        // some arbitrary verifier, but we're actually using the same verifier
+        // `rustls` makes by default.
+        let server_cert_verifier: Arc<dyn rustls::ServerCertVerifier> =
+            Arc::new(rustls::WebPkiVerifier::new(
+                // TODO(eliza): can we use the same `Arc<RootCertStore>` here?
+                // it would be nice if rustls could let us do that...
+                self.0.clone(),
+                &[], // no certificate transparency logs
+            ));
 
         // Ensure the certificate is valid for the services we terminate for
         // TLS. This assumes that server cert validation does the same or
@@ -263,18 +311,39 @@ impl TrustAnchors {
         //
         // TODO: Restrict accepted signatutre algorithms.
         static NO_OCSP: &[u8] = &[];
-        client
-            .get_verifier()
-            .verify_server_cert(&client.root_store, &crt.chain, (&crt.id).into(), NO_OCSP)
+        let name = rustls::ServerName::from(crt.name());
+        let end_entity = &crt.chain[0];
+        let intermediates = &crt.chain[1..];
+        server_cert_verifier
+            .verify_server_cert(
+                end_entity,
+                intermediates,
+                &name,
+                &mut std::iter::empty(), // no certificate transparency logs
+                NO_OCSP,
+                std::time::SystemTime::now(),
+            )
             .map_err(InvalidCrt)?;
         debug!("certified {}", crt.id);
 
         let k = SigningKey(key.0);
-        let key = rustls::sign::CertifiedKey::new(crt.chain, Arc::new(Box::new(k)));
-        let resolver = Arc::new(CertResolver(key));
+        let key = rustls::sign::CertifiedKey::new(crt.chain, Arc::new(k));
+        let resolver = CertResolver(Arc::new(key));
 
-        // Enable client authentication.
-        client.client_auth_cert_resolver = resolver.clone();
+        // TODO(eliza): can we use
+        // `rustls::client_config_builder_with_safe_defaults` because the only
+        // thing we set explicitly is the TLS versions, and rustls should set
+        // TLSv1.2 and TLSv1.3 by default?
+        let client = rustls::config_builder()
+            .with_safe_default_cipher_suites()
+            .with_safe_default_kx_groups()
+            .with_protocol_versions(&TLS_VERSIONS)
+            .for_client()
+            .expect("client config must be valid")
+            // Verify certs with the configured trust anchors.
+            .with_custom_certificate_verifier(server_cert_verifier)
+            // Enable client authentication.
+            .with_client_cert_resolver(Arc::new(resolver.clone()));
 
         // Ask TLS clients for a certificate and accept any certificate issued
         // by our trusted CA(s).
@@ -285,11 +354,15 @@ impl TrustAnchors {
         // TODO: lock down the verification further.
         //
         // TODO: Change Rustls's API to Avoid needing to clone `root_cert_store`.
-        let mut server = rustls::ServerConfig::new(
-            rustls::AllowAnyAnonymousOrAuthenticatedClient::new(self.0.root_store.clone()),
-        );
-        server.versions = TLS_VERSIONS.to_vec();
-        server.cert_resolver = resolver;
+        let client_cert_verifier = AllowAnyAnonymousOrAuthenticatedClient::new(self.0.clone());
+        let server = rustls::config_builder()
+            .with_safe_default_cipher_suites()
+            .with_safe_default_kx_groups()
+            .with_protocol_versions(&TLS_VERSIONS)
+            .for_server()
+            .expect("server config must be valid")
+            .with_client_cert_verifier(client_cert_verifier)
+            .with_cert_resolver(Arc::new(resolver));
 
         Ok(CrtKey {
             id: crt.id,
@@ -300,7 +373,8 @@ impl TrustAnchors {
     }
 
     pub fn client_config(&self) -> Arc<rustls::ClientConfig> {
-        self.0.clone()
+        // self.client_config.clone()
+        todo!(":hmmCat:")
     }
 }
 
@@ -377,7 +451,7 @@ impl rustls::ResolvesClientCert for CertResolver {
         &self,
         _acceptable_issuers: &[&[u8]],
         sigschemes: &[rustls::SignatureScheme],
-    ) -> Option<rustls::sign::CertifiedKey> {
+    ) -> Option<Arc<rustls::sign::CertifiedKey>> {
         // The proxy's server-side doesn't send the list of acceptable issuers so
         // don't bother looking at `_acceptable_issuers`.
         self.resolve_(sigschemes)
@@ -392,7 +466,7 @@ impl CertResolver {
     fn resolve_(
         &self,
         sigschemes: &[rustls::SignatureScheme],
-    ) -> Option<rustls::sign::CertifiedKey> {
+    ) -> Option<Arc<rustls::sign::CertifiedKey>> {
         if !sigschemes.contains(&SIGNATURE_ALG_RUSTLS_SCHEME) {
             debug!("signature scheme not supported -> no certificate");
             return None;
@@ -402,9 +476,10 @@ impl CertResolver {
 }
 
 impl rustls::ResolvesServerCert for CertResolver {
-    fn resolve(&self, hello: rustls::ClientHello<'_>) -> Option<rustls::sign::CertifiedKey> {
+    fn resolve(&self, hello: rustls::ClientHello<'_>) -> Option<Arc<rustls::sign::CertifiedKey>> {
         let server_name = if let Some(server_name) = hello.server_name() {
-            server_name
+            webpki::DnsNameRef::try_from_ascii_str(server_name)
+                .expect("server name must be a valid server name")
         } else {
             debug!("no SNI -> no certificate");
             return None;
@@ -415,8 +490,8 @@ impl rustls::ResolvesServerCert for CertResolver {
             .first()
             .map(rustls::Certificate::as_ref)
             .unwrap_or(&[]); // An empty input will fail to parse.
-        if let Err(err) =
-            webpki::EndEntityCert::from(c).and_then(|c| c.verify_is_valid_for_dns_name(server_name))
+        if let Err(err) = webpki::EndEntityCert::try_from(c)
+            .and_then(|c| c.verify_is_valid_for_dns_name(server_name))
         {
             debug!(
                 "our certificate is not valid for the SNI name -> no certificate: {:?}",
@@ -425,7 +500,7 @@ impl rustls::ResolvesServerCert for CertResolver {
             return None;
         }
 
-        self.resolve_(hello.sigschemes())
+        self.resolve_(hello.signature_schemes())
     }
 }
 

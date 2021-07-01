@@ -15,7 +15,7 @@ use std::{
     task::{Context, Poll},
 };
 pub use tokio_rustls::client::TlsStream;
-use tokio_rustls::rustls::{self, Session};
+use tokio_rustls::rustls::{self, Connection};
 use tracing::{debug, trace};
 
 /// A newtype for target server identities.
@@ -147,7 +147,7 @@ where
         Either::Right(Box::pin(async move {
             let io = connect.await?;
             let io = handshake.connect((&server_id.0).into(), io).await?;
-            if let Some(alpn) = io.get_ref().1.get_alpn_protocol() {
+            if let Some(alpn) = io.get_ref().1.alpn_protocol() {
                 debug!(alpn = ?std::str::from_utf8(alpn));
             }
             Ok(io::EitherIo::Right(io))

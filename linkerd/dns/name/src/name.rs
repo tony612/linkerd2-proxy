@@ -6,7 +6,7 @@ use thiserror::Error;
 /// are specified in [RFC 5280 Section 7.2], except that underscores are also
 /// allowed.
 #[derive(Clone, Eq, PartialEq, Hash)]
-pub struct Name(webpki::DNSName);
+pub struct Name(webpki::DnsName);
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
 #[error("invalid DNS name")]
@@ -37,8 +37,8 @@ impl fmt::Display for Name {
     }
 }
 
-impl From<webpki::DNSName> for Name {
-    fn from(n: webpki::DNSName) -> Self {
+impl From<webpki::DnsName> for Name {
+    fn from(n: webpki::DnsName) -> Self {
         Name(n)
     }
 }
@@ -46,7 +46,7 @@ impl From<webpki::DNSName> for Name {
 impl<'a> TryFrom<&'a [u8]> for Name {
     type Error = InvalidName;
     fn try_from(s: &[u8]) -> Result<Self, Self::Error> {
-        webpki::DNSNameRef::try_from_ascii(s)
+        webpki::DnsNameRef::try_from_ascii(s)
             .map_err(|_invalid| InvalidName)
             .map(|r| r.to_owned().into())
     }
@@ -59,21 +59,21 @@ impl<'a> std::str::FromStr for Name {
     }
 }
 
-impl From<Name> for webpki::DNSName {
-    fn from(Name(name): Name) -> webpki::DNSName {
+impl From<Name> for webpki::DnsName {
+    fn from(Name(name): Name) -> webpki::DnsName {
         name
     }
 }
 
-impl<'t> From<&'t Name> for webpki::DNSNameRef<'t> {
-    fn from(Name(ref name): &'t Name) -> webpki::DNSNameRef<'t> {
+impl<'t> From<&'t Name> for webpki::DnsNameRef<'t> {
+    fn from(Name(ref name): &'t Name) -> webpki::DnsNameRef<'t> {
         name.as_ref()
     }
 }
 
 impl AsRef<str> for Name {
     fn as_ref(&self) -> &str {
-        <webpki::DNSName as AsRef<str>>::as_ref(&self.0)
+        <webpki::DnsName as AsRef<str>>::as_ref(&self.0)
     }
 }
 

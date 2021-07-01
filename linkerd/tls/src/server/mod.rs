@@ -18,7 +18,7 @@ use std::{
 };
 use thiserror::Error;
 use tokio::time::{self, Duration};
-use tokio_rustls::rustls::{self, Session};
+use tokio_rustls::rustls::{self, Connection as _};
 pub use tokio_rustls::server::TlsStream;
 use tower::util::ServiceExt;
 use tracing::{debug, trace, warn};
@@ -28,7 +28,8 @@ pub type Config = Arc<rustls::ServerConfig>;
 /// Produces a server config that fails to handshake all connections.
 pub fn empty_config() -> Config {
     let verifier = rustls::NoClientAuth::new();
-    Arc::new(rustls::ServerConfig::new(verifier))
+    // Arc::new(rustls::ServerConfig::new(verifier))
+    todo!(":hmmCat:")
 }
 
 /// A newtype for remote client idenities.
@@ -280,7 +281,7 @@ where
     let negotiated_protocol = io
         .get_ref()
         .1
-        .get_alpn_protocol()
+        .alpn_protocol()
         .map(|b| NegotiatedProtocol(b.into()));
 
     debug!(client.id = ?client_id, alpn = ?negotiated_protocol, "Accepted TLS connection");
