@@ -18,7 +18,7 @@ linkerd-io = { path = "../io" }
 linkerd-stack = { path = "../stack" }
 thiserror = "1.0"
 tokio = { version = "1", features = ["macros", "time"] }
-tokio-rustls = "0.22"
+tokio-rustls = { git = "https://github.com/tokio-rs/tls", branch = "eliza/rustls-0.20" }
 tower = "0.4.8"
 tracing = "0.1.26"
 webpki = "0.21"
