@@ -34,8 +34,6 @@ type Certify = Box<
         > + Send,
 >;
 
-const TLS_VERSIONS: &[rustls::ProtocolVersion] = &[rustls::ProtocolVersion::TLSv1_2];
-
 struct Certificates {
     pub leaf: Vec<u8>,
     pub intermediates: Vec<Vec<u8>>,
@@ -48,14 +46,11 @@ impl Certificates {
     {
         let f = fs::File::open(p)?;
         let mut r = io::BufReader::new(f);
-        let certs = rustls::internal::pemfile::certs(&mut r)
+        let mut certs = rustls_pemfile::certs(&mut r)
             .map_err(|_| io::Error::new(io::ErrorKind::Other, "rustls error reading certs"))?;
-        let leaf = certs
-            .get(0)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "no certs in pemfile"))?
-            .as_ref()
-            .into();
-        let intermediates = certs[1..].iter().map(|i| i.as_ref().into()).collect();
+        let mut certs = certs.drain(..);
+        let leaf = certs.next().expect("no leaf cert in pemfile");
+        let intermediates = certs.collect();
 
         Ok(Certificates {
             leaf,
@@ -95,21 +90,22 @@ impl Identity {
     ) -> (Arc<rustls::ClientConfig>, Arc<rustls::ServerConfig>) {
         use std::io::Cursor;
         let mut roots = rustls::RootCertStore::empty();
-        roots
-            .add_pem_file(&mut Cursor::new(trust_anchors))
-            .expect("add pem file");
+        let trust_anchors =
+            rustls_pemfile::certs(&mut Cursor::new(trust_anchors)).expect("error parsing pemfile");
+        let trust_anchors = trust_anchors
+            .iter()
+            .map(|cert| webpki::TrustAnchor::try_from_cert_der(&cert[..]).unwrap())
+            .collect::<Vec<_>>();
+        roots.add_server_trust_anchors(trust_anchors.iter());
 
-        let mut client_config = rustls::ClientConfig::new();
-        client_config.root_store = roots;
+        let client_config = rustls::client_config_builder_with_safe_defaults()
+            .with_root_certificates(roots.clone(), &[])
+            .with_no_client_auth();
 
-        let mut server_config = rustls::ServerConfig::new(
-            rustls::AllowAnyAnonymousOrAuthenticatedClient::new(client_config.root_store.clone()),
-        );
-
-        server_config.versions = TLS_VERSIONS.to_vec();
-        server_config
-            .set_single_cert(certs.chain(), key)
-            .expect("set server resover");
+        let server_config = rustls::server_config_builder_with_safe_defaults()
+            .with_client_cert_verifier(rustls::AllowAnyAnonymousOrAuthenticatedClient::new(roots))
+            .with_single_cert(certs.chain(), key)
+            .unwrap();
 
         (Arc::new(client_config), Arc::new(server_config))
     }

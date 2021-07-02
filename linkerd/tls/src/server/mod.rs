@@ -27,7 +27,7 @@ pub type Config = Arc<rustls::ServerConfig>;
 
 /// Produces a server config that fails to handshake all connections.
 pub fn empty_config() -> Config {
-    let verifier = rustls::NoClientAuth::new();
+    // let verifier = rustls::NoClientAuth::new();
     // Arc::new(rustls::ServerConfig::new(verifier))
     todo!(":hmmCat:")
 }
@@ -293,19 +293,20 @@ where
 }
 
 fn client_identity<S>(tls: &TlsStream<S>) -> Option<ClientId> {
-    use webpki::GeneralDNSNameRef;
+    use std::convert::TryFrom;
+    use webpki::GeneralDnsNameRef;
 
     let (_io, session) = tls.get_ref();
-    let certs = session.get_peer_certificates()?;
+    let certs = session.peer_certificates()?;
     let c = certs.first().map(rustls::Certificate::as_ref)?;
-    let end_cert = webpki::EndEntityCert::from(c).ok()?;
+    let end_cert = webpki::EndEntityCert::try_from(c).ok()?;
     let dns_names = end_cert.dns_names().ok()?;
 
     match dns_names.first()? {
-        GeneralDNSNameRef::DNSName(n) => {
+        GeneralDnsNameRef::DnsName(n) => {
             Some(ClientId(id::Name::from(dns::Name::from(n.to_owned()))))
         }
-        GeneralDNSNameRef::Wildcard(_) => {
+        GeneralDnsNameRef::Wildcard(_) => {
             // Wildcards can perhaps be handled in a future path...
             None
         }
