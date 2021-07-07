@@ -123,7 +123,7 @@ impl rustls::sign::Signer for Signer {
             .map_err(|ring::error::Unspecified| rustls::Error::General("Signing Failed".to_owned()))
     }
 
-    fn get_scheme(&self) -> rustls::SignatureScheme {
+    fn scheme(&self) -> rustls::SignatureScheme {
         SIGNATURE_ALG_RUSTLS_SCHEME
     }
 }
@@ -236,7 +236,6 @@ impl TrustAnchors {
     #[cfg(any(test, feature = "test-util"))]
     fn empty() -> Self {
         TrustAnchors(rustls::RootCertStore::empty())
-        // todo!("eliza")
     }
 
     pub fn from_pem(s: &str) -> Option<Self> {
@@ -334,11 +333,10 @@ impl TrustAnchors {
         // `rustls::client_config_builder_with_safe_defaults` because the only
         // thing we set explicitly is the TLS versions, and rustls should set
         // TLSv1.2 and TLSv1.3 by default?
-        let client = rustls::config_builder()
+        let client = rustls::ClientConfig::builder()
             .with_safe_default_cipher_suites()
             .with_safe_default_kx_groups()
             .with_protocol_versions(&TLS_VERSIONS)
-            .for_client()
             .expect("client config must be valid")
             // Verify certs with the configured trust anchors.
             .with_custom_certificate_verifier(server_cert_verifier)
@@ -355,11 +353,10 @@ impl TrustAnchors {
         //
         // TODO: Change Rustls's API to Avoid needing to clone `root_cert_store`.
         let client_cert_verifier = AllowAnyAnonymousOrAuthenticatedClient::new(self.0.clone());
-        let server = rustls::config_builder()
+        let server = rustls::ServerConfig::builder()
             .with_safe_default_cipher_suites()
             .with_safe_default_kx_groups()
             .with_protocol_versions(&TLS_VERSIONS)
-            .for_server()
             .expect("server config must be valid")
             .with_client_cert_verifier(client_cert_verifier)
             .with_cert_resolver(Arc::new(resolver));

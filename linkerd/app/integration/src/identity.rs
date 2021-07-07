@@ -98,11 +98,13 @@ impl Identity {
             .collect::<Vec<_>>();
         roots.add_server_trust_anchors(trust_anchors.iter());
 
-        let client_config = rustls::client_config_builder_with_safe_defaults()
+        let client_config = rustls::ClientConfig::builder()
+            .with_safe_defaults()
             .with_root_certificates(roots.clone(), &[])
             .with_no_client_auth();
 
-        let server_config = rustls::server_config_builder_with_safe_defaults()
+        let server_config = rustls::ServerConfig::builder()
+            .with_safe_defaults()
             .with_client_cert_verifier(rustls::AllowAnyAnonymousOrAuthenticatedClient::new(roots))
             .with_single_cert(certs.chain(), key)
             .unwrap();

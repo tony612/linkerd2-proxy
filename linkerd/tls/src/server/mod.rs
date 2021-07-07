@@ -27,9 +27,15 @@ pub type Config = Arc<rustls::ServerConfig>;
 
 /// Produces a server config that fails to handshake all connections.
 pub fn empty_config() -> Config {
-    // let verifier = rustls::NoClientAuth::new();
-    // Arc::new(rustls::ServerConfig::new(verifier))
-    todo!(":hmmCat:")
+    Arc::new(
+        rustls::ServerConfig::builder()
+            .with_safe_defaults()
+            // disable client auth
+            .with_no_client_auth()
+            // empty cert resolver --- no server certificates, so handshakes will
+            // always fail.
+            .with_cert_resolver(Arc::new(rustls::ResolvesServerCertUsingSni::new())),
+    )
 }
 
 /// A newtype for remote client idenities.

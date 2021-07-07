@@ -1930,8 +1930,8 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.20.0-beta1"
-source = "git+https://github.com/ctz/rustls#98d087e7939f5c098a80b0e0f21982c050a053cd"
+version = "0.20.0-beta2"
+source = "git+https://github.com/ctz/rustls#b06279fdaf1f4818081fe32e8eee6b4e1a03f9bc"
 dependencies = [
  "log",
  "ring",
@@ -2163,7 +2163,7 @@ dependencies = [
 [[package]]
 name = "tokio-rustls"
 version = "0.23.0"
-source = "git+https://github.com/tokio-rs/tls?branch=eliza/rustls-0.20#b433932bf1025960e5b99f353cf8eee4ce2f08f3"
+source = "git+https://github.com/tokio-rs/tls?branch=eliza/rustls-0.20#04f76c1e09486b23789af908f531d8004fd79fc7"
 dependencies = [
  "rustls",
  "tokio",
