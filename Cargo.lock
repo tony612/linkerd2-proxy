@@ -2163,7 +2163,7 @@ dependencies = [
 [[package]]
 name = "tokio-rustls"
 version = "0.23.0"
-source = "git+https://github.com/tokio-rs/tls?branch=eliza/rustls-0.20#04f76c1e09486b23789af908f531d8004fd79fc7"
+source = "git+https://github.com/tokio-rs/tls?branch=eliza/rustls-0.20#14a224bf97260f8619d3cf7c773fb93a6045d4f8"
 dependencies = [
  "rustls",
  "tokio",
