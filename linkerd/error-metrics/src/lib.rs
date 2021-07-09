@@ -9,12 +9,8 @@ pub use self::layer::RecordErrorLayer;
 pub use self::service::RecordError;
 pub use linkerd_metrics::FmtLabels;
 use linkerd_metrics::{self as metrics, Counter, FmtMetrics};
-use std::{
-    collections::HashMap,
-    fmt,
-    hash::Hash,
-    sync::{Arc, Mutex},
-};
+use parking_lot::Mutex;
+use std::{collections::HashMap, fmt, hash::Hash, sync::Arc};
 
 pub trait LabelError<E> {
     type Labels: FmtLabels + Hash + Eq;
@@ -22,7 +18,7 @@ pub trait LabelError<E> {
     fn label_error(&self, error: &E) -> Self::Labels;
 }
 
-type Metric = metrics::Metric<'static, &'static str, Counter>;
+pub type Metric = metrics::Metric<'static, &'static str, Counter>;
 
 /// Produces layers and reports results.
 #[derive(Debug)]
@@ -58,13 +54,7 @@ impl<K: Hash + Eq> Clone for Registry<K> {
 
 impl<K: FmtLabels + Hash + Eq> FmtMetrics for Registry<K> {
     fn fmt_metrics(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let errors = match self.errors.lock() {
-            Ok(errors) => errors,
-            Err(_) => return Ok(()),
-        };
-        if errors.is_empty() {
-            return Ok(());
-        }
+        let errors = self.errors.lock();
 
         self.metric.fmt_help(f)?;
         self.metric.fmt_scopes(f, errors.iter(), |c| &c)?;
