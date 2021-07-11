@@ -62,7 +62,7 @@ impl<N> Outbound<N> {
                     }
                 },
             ))
-            .instrument(|_: &_| debug_span!("profile"))
+            .instrument(|_: &tcp::Accept| debug_span!("profile"))
             .push_on_response(
                 svc::layers()
                     // If the traffic split is empty/unavailable, eagerly fail

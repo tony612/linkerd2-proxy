@@ -63,9 +63,9 @@ members = [
 # Debug symbols end up chewing up several GB of disk space, so better to just
 # disable them.
 [profile.dev]
-debug = false
+# debug = false
 [profile.test]
-debug = false
+# debug = false
 
 [patch.crates-io]
 webpki = { git = "https://github.com/linkerd/webpki", branch = "cert-dns-names-0.21" }

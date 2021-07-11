@@ -107,7 +107,7 @@ impl<C> Outbound<C> {
         let stack = connect
             .push_make_thunk()
             .push_on_response(super::Forward::layer())
-            .instrument(|_: &_| debug_span!("tcp.forward"))
+            .instrument(|_: &T| debug_span!("tcp.forward"))
             .push(svc::BoxNewService::layer())
             .check_new_service::<T, I>();
 

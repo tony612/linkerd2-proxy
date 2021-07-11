@@ -194,7 +194,7 @@ where
                     .push(tcp::Forward::layer())
                     .push(drain::Retain::layer(rt.drain.clone())),
             )
-            .instrument(|_: &_| debug_span!("tcp"))
+            .instrument(|_: &TcpEndpoint| debug_span!("tcp"))
             .push(svc::BoxNewService::layer())
             .check_new::<TcpEndpoint>();
 
@@ -258,7 +258,7 @@ where
                 self.runtime.identity.clone(),
                 config.detect_protocol_timeout,
             ))
-            .instrument(|_: &_| debug_span!("proxy"))
+            .instrument(|_: &T| debug_span!("proxy"))
             .push_switch(
                 move |t: T| {
                     let OrigDstAddr(addr) = t.param();
@@ -285,7 +285,7 @@ where
                 self.push_tcp_forward(server_port)
                     .push_direct(gateway)
                     .stack
-                    .instrument(|_: &_| debug_span!("direct"))
+                    .instrument(|_: &T| debug_span!("direct"))
                     .into_inner(),
             )
             .instrument(|a: &T| {
