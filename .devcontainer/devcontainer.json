@@ -5,7 +5,8 @@
 	"build": {
 		"dockerfile": "Dockerfile"
 	},
-	"runArgs": [ "--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined" ],
+	// "runArgs": [ "--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined" ],
+	"runArgs": ["--privileged"],
 
 	// Set *default* container specific settings.json values on container create.
 	"settings": {
@@ -32,10 +33,16 @@
 	// "postCreateCommand": "rustc --version",
 
 	// Comment out connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
-	"remoteUser": "vscode",
+	// "remoteUser": "vscode",
 
 	"remoteEnv": {
 		"LINKERD2_PROXY_IDENTITY_DISABLED": "1",
 		"LINKERD2_PROXY_DESTINATION_SVC_ADDR": "foo.bar:4000",
-	}
+	},
+
+	"mounts": [
+		"source=dev_vol-linkerd2_proxy-cargo_target,target=/workspaces/linkerd2-proxy/target,type=volume",
+		"source=dev_vol-linkerd2_proxy-cargo_registry,target=/usr/local/cargo/registry,type=volume",
+		"source=dev_vol-linkerd2_proxy-vscode_ext,target=/root/.vscode-server/extensions,type=volume",
+	]
 }
